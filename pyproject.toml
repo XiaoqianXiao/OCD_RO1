@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "ocd"
+version = "0.1.0"
+description = ""
+authors = ["XiaoqianXiao <xiao.xiaoqian.320@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+scipy = "^1.15.3"
+templateflow = "^24.2.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
