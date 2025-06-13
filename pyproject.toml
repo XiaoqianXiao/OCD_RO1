@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.10"
 scipy = "^1.15.3"
 templateflow = "^24.2.2"
+nipype = "^1.10.0"
 
 
 [build-system]

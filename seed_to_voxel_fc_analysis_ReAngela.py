@@ -15,7 +15,7 @@ subjects = [args.subject]
 project_dir = '/project/6079231/dliang55/R01_AOCD'
 bids_dir = os.path.join(project_dir, 'derivatives/fmriprep-1.4.1')
 scratch_dir = '/scratch/xxqian'
-output_dir = os.path.join(project_dir, 'OCD')
+output_dir = os.path.join(scratch_dir, 'OCD')
 work_dir = os.path.join(scratch_dir, 'work_flow')
 roi_dir = os.path.join(scratch_dir, 'roi')
 
