@@ -7,4 +7,4 @@ N=$((${#SUBJECTS[@]} - 1))
 echo "Submitting jobs for $((N + 1)) subjects: ${SUBJECTS[@]}"
 
 # Submit the job with dynamic array
-sbatch --array=0-$N submit_seed_to_voxel_fc_analysis.sh
+sbatch --array=0-$N run_1st.sbatch
