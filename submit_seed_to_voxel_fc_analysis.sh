@@ -16,7 +16,7 @@ SUBJECTS=($(find /project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1 -
 SUBJECT=${SUBJECTS[$SLURM_ARRAY_TASK_ID]}
 
 # Path to Apptainer container
-CONTAINER="/scratch/xxqian/images/STV_1st_level_1.0.sif"
+CONTAINER="/scratch/xxqian/repo/image/STV_1st_level_1.0.sif"
 
 # Run the Apptainer container for one subject
 apptainer run \
