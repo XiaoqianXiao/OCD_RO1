@@ -1,47 +1,11 @@
-Bootstrap: docker
-From: ubuntu:20.04
+Bootstrap: localimage
+From: narsad-fmri_1st_level_1.0.sif
 
 %environment
     export DEBIAN_FRONTEND=noninteractive
     export FSLDIR=/usr/local/fsl
     export PATH=${FSLDIR}/bin:$PATH
     export FSLOUTPUTTYPE=NIFTI_GZ
-
-%post
-    # Set up environment
-    export DEBIAN_FRONTEND=noninteractive
-
-    # Install system dependencies
-    apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        python3 \
-        python3-pip \
-        python3-dev \
-        wget \
-        bzip2 \
-        libglib2.0-0 \
-        libxext6 \
-        libsm6 \
-        libxrender1 \
-        git \
-        pkg-config \
-        libhdf5-dev \
-        && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-    # Install FSL 6.0.4
-    wget https://fsl.fmrib.ox.ac.uk/fsldownloads/fsl-6.0.4-centos6_64.tar.gz
-    tar -xzf fsl-6.0.4-centos6_64.tar.gz -C /usr/local
-    rm fsl-6.0.4-centos6_64.tar.gz
-
-    # Install Python dependencies
-    pip3 install --upgrade pip
-    pip3 install \
-        bids \
-        nipype \
-        pandas \
-        templateflow \
-        numpy \
-        nilearn
 
 %files
     seed_to_voxel_fc_analysis_ReAngela.py /app/seed_to_voxel_fc_analysis_ReAngela.py
