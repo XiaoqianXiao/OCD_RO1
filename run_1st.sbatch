@@ -28,8 +28,7 @@ APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01
 
 # Run the Apptainer container for one subject
 if [ -n "$SUBJECT" ]; then
-  apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER} \
-    python3 /app/seed_to_voxel_fc_analysis_ReAngela.py first-level --subject sub-${SUBJECT}
+  apptainer run --bind ${APPTAINER_BIND} ${CONTAINER} first-level --subject sub-${SUBJECT}
 else
   echo "Error: No subject found for array index $SLURM_ARRAY_TASK_ID" >&2
   exit 1
