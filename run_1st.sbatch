@@ -22,5 +22,4 @@ CONTAINER="/scratch/xxqian/repo/image/STV_1st_level_1.0.sif"
 apptainer run \
     --bind /project:/project,/scratch:/scratch \
     $CONTAINER \
-    python /app/seed_to_voxel_fc_analysis_ReAngela.py first-level
-    --subject $SUBJECT
+    python /app/seed_to_voxel_fc_analysis_ReAngela.py first-level --subject sub-${SUBJECT}
