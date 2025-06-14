@@ -20,7 +20,6 @@ CONTAINER="/scratch/xxqian/repo/image/STV_1st_and_group_level.sif"
 
 # Set environment variables
 export FSLOUTPUTTYPE=NIFTI_GZ
-export APPTAINERENV_TEMPLATEFLOW_HOME=/templateflow
 export OMP_NUM_THREADS=8
 
 # Bind directories
