@@ -56,9 +56,8 @@ def extract_pcc_roi(networks_file):
     """Extract PCC ROI from networks.nii (label 4) and resample to MNI152NLin6Asym space using FLIRT."""
     from nilearn import image
     from nipype.interfaces.fsl import FLIRT
-    from templateflow.api import get as tpl_get
     try:
-        group_mask_file = str(tpl_get('MNI152NLin6Asym', resolution=2, desc='brain', suffix='mask'))
+        group_mask_file = os.path.join(roi_dir, 'tpl-MNI152NLin6Asym_res-02_desc-brain_mask.nii.gz')
         group_mask = image.load_img(group_mask_file)
         logger.info(f"Loaded group mask: {group_mask_file}")
         networks_img = image.load_img(networks_file)
