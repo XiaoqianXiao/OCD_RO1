@@ -24,7 +24,7 @@ export APPTAINERENV_TEMPLATEFLOW_HOME=/templateflow
 export OMP_NUM_THREADS=8
 
 # Bind directories
-APPTAINER_BIND="/scratch/xxqian/work_flow:/scratch,/project/6079231/dliang55/R01_AOCD/OCD:/output,/scratch/xxqian/roi:/roi"
+APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian/work_flow:/scratch/xxqian/work_flow,/scratch/xxqian/OCD:/scratch/xxqian/OCD,/scratch/xxqian/roi:/scratch/xxqian/roi"
 
 # Run the Apptainer container for one subject
 if [ -n "$SUBJECT" ]; then
