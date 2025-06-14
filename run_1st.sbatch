@@ -2,13 +2,13 @@
 #SBATCH --job-name=seed_to_voxel_analysis
 #SBATCH --account=def-jfeusner
 #SBATCH --time=02:00:00
-#SBATCH --mem=16G
-#SBATCH --cpus-per-task=4
-#SBATCH --output=STV%A_%a.out
-#SBATCH --error=STV_%A_%a.err
+#SBATCH --mem=32G
+#SBATCH --cpus-per-task=8
+#SBATCH --output=/scratch/xxqian/logs/STV_%A_%a.out
+#SBATCH --error=/scratch/xxqian/logs/STV_%A_%a.err
 #SBATCH --array=0-%N
 
-
+# Load Apptainer module
 module load apptainer
 
 # Get subject from array
@@ -16,10 +16,21 @@ SUBJECTS=($(find /project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1 -
 SUBJECT=${SUBJECTS[$SLURM_ARRAY_TASK_ID]}
 
 # Path to Apptainer container
-CONTAINER="/scratch/xxqian/repo/image/STV_1st_level_1.0.sif"
+CONTAINER="/scratch/xxqian/repo/image/STV_1st_and_group_level.sif"
+
+# Set environment variables
+export FSLOUTPUTTYPE=NIFTI_GZ
+export APPTAINERENV_TEMPLATEFLOW_HOME=/templateflow
+export OMP_NUM_THREADS=8
+
+# Bind directories
+APPTAINER_BIND="/scratch/xxqian/work_flow:/scratch,/project/6079231/dliang55/R01_AOCD/OCD:/output,/scratch/xxqian/roi:/roi"
 
 # Run the Apptainer container for one subject
-apptainer run \
-    --bind /project:/project,/scratch:/scratch \
-    $CONTAINER \
-    python /app/seed_to_voxel_fc_analysis_ReAngela.py first-level --subject sub-${SUBJECT}
+if [ -n "$SUBJECT" ]; then
+  apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER} \
+    python3 /app/seed_to_voxel_fc_analysis_ReAngela.py first-level --subject sub-${SUBJECT}
+else
+  echo "Error: No subject found for array index $SLURM_ARRAY_TASK_ID" >&2
+  exit 1
+fi

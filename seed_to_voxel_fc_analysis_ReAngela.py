@@ -4,6 +4,18 @@ import numpy as np
 from nilearn import image, masking
 import pandas as pd
 import argparse
+import logging
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('/scratch/xxqian/OCD/seed_to_voxel_fc_analysis.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Compute seed-based functional connectivity maps.')
@@ -27,7 +39,6 @@ os.makedirs(work_dir, exist_ok=True)
 networks_file = os.path.join(roi_dir, 'networks.nii')
 sessions = ['ses-baseline', 'ses-followup']
 
-
 def validate_paths(subject, session):
     """Validate input paths exist for subject-specific mask and networks file."""
     mask_path = os.path.join(
@@ -36,47 +47,43 @@ def validate_paths(subject, session):
     )
     for path in [networks_file, mask_path]:
         if not os.path.exists(path):
+            logger.error(f"Path does not exist for {subject} {session}: {path}")
             raise FileNotFoundError(f"Path does not exist: {path}")
+    logger.info(f"Validated paths for {subject} {session}: mask={mask_path}, networks={networks_file}")
     return mask_path
 
-
 def extract_pcc_roi(networks_file):
-    """Extract PCC ROI from networks.nii (label 4) and resample to MNI152NLin6Asym space
-    using FLIRT."""
+    """Extract PCC ROI from networks.nii (label 4) and resample to MNI152NLin6Asym space using FLIRT."""
     from nilearn import image
     from nipype.interfaces.fsl import FLIRT
-    import os
-    from templateflow.api import get as tpl_get, templates as get_tpl_list
-    group_mask_file = str(tpl_get('MNI152NLin6Asym', resolution=2, desc='brain', suffix='mask'))
-    group_mask = image.load_img(group_mask_file)
-    # Load the networks image
-    networks_img = image.load_img(networks_file)
-    # Define output file path for resampled image
-    output_file = 'networks_resampled.nii.gz'
-    # Run FLIRT to resample networks image to 2mm isotropic resolution in group mask space
-    flirt = FLIRT()
-    flirt.inputs.in_file = networks_file
-    flirt.inputs.reference = group_mask
-    flirt.inputs.out_file = output_file
-    flirt.inputs.apply_isoxfm = 2  # Resample to 2mm isotropic resolution
-    flirt.inputs.interp = 'nearestneighbour'  # Use nearest neighbor for label data
-    flirt.run()
-    # Load resampled image
-    networks_resampled = image.load_img(output_file)
-    # PCC is 4th volume (index 3)
-    pcc_mask = image.index_img(networks_resampled, 3)
-    # Clean up temporary file
-    os.remove(output_file)
-    return pcc_mask
-
+    from templateflow.api import get as tpl_get
+    try:
+        group_mask_file = str(tpl_get('MNI152NLin6Asym', resolution=2, desc='brain', suffix='mask'))
+        group_mask = image.load_img(group_mask_file)
+        logger.info(f"Loaded group mask: {group_mask_file}")
+        networks_img = image.load_img(networks_file)
+        output_file = 'networks_resampled.nii.gz'
+        flirt = FLIRT()
+        flirt.inputs.in_file = networks_file
+        flirt.inputs.reference = group_mask
+        flirt.inputs.out_file = output_file
+        flirt.inputs.apply_isoxfm = 2
+        flirt.inputs.interp = 'nearestneighbour'
+        flirt.run()
+        networks_resampled = image.load_img(output_file)
+        pcc_mask = image.index_img(networks_resampled, 3)
+        os.remove(output_file)
+        logger.info("Extracted PCC ROI successfully")
+        return pcc_mask
+    except Exception as e:
+        logger.error(f"Failed to extract PCC ROI: {str(e)}")
+        raise
 
 def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
     """Process a single fMRI run to compute seed-based functional connectivity."""
     try:
-        # Load fMRI data
+        logger.info(f"Processing run: fMRI={fmri_file}, confounds={confounds_file}, output={output_path}")
         fmri_img = image.load_img(fmri_file)
-
-        # Load confounds
         confounds_df = pd.read_csv(confounds_file, sep='\t')
         motion_params = confounds_df[[
             'trans_x', 'trans_y', 'trans_z',
@@ -84,27 +91,21 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
             'trans_x_derivative1', 'trans_y_derivative1', 'trans_z_derivative1',
             'rot_x_derivative1', 'rot_y_derivative1', 'rot_z_derivative1'
         ]].fillna(0)
-
-        # Compute artifact flags
         fd_flags = confounds_df['framewise_displacement'].fillna(0) > 0.5
-        # Compute global signal Z-scores
         if 'global_signal' in confounds_df.columns:
             global_signal = confounds_df['global_signal'].fillna(confounds_df['global_signal'].mean())
             gs_z_scores = np.abs((global_signal - global_signal.mean()) / global_signal.std())
             gs_flags = gs_z_scores > 3
-            art_flags = fd_flags | gs_flags  # Combine FD and GS flags
+            art_flags = fd_flags | gs_flags
         else:
             art_flags = fd_flags
-
-        # Remove artifactual volumes
+            logger.warning("Global signal not found in confounds; using FD flags only")
         valid_timepoints = ~art_flags
-        if valid_timepoints.sum() < 10:  # Minimum number of valid timepoints
+        logger.info(f"Valid timepoints: {valid_timepoints.sum()}/{len(valid_timepoints)}")
+        if valid_timepoints.sum() < 10:
+            logger.warning(f"Too few valid timepoints ({valid_timepoints.sum()}) for {fmri_file}")
             return None
-
-        # Subset confounds for valid timepoints
         motion_params = motion_params[valid_timepoints]
-
-        # Extract seed time series with confound regression
         seed_masker = masking.NiftiMasker(
             mask_img=seed_roi,
             standardize='zscore',
@@ -115,8 +116,6 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
         )
         seed_time_series = seed_masker.fit_transform(fmri_img)[valid_timepoints]
         seed_time_series = np.mean(seed_time_series, axis=1)
-
-        # Extract brain time series using subject-specific mask with confound regression
         brain_masker = masking.NiftiMasker(
             mask_img=brain_mask,
             standardize='zscore',
@@ -126,68 +125,63 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
             confounds=motion_params
         )
         brain_time_series = brain_masker.fit_transform(fmri_img)[valid_timepoints]
-
-        # Compute seed-to-voxel correlations
         corr_matrix = np.corrcoef(seed_time_series, brain_time_series.T)
         fc_map = corr_matrix[0, 1:]
         fc_map = np.arctanh(fc_map)
         fc_img = brain_masker.inverse_transform(fc_map)
         fc_img.to_filename(output_path)
-
+        logger.info(f"Saved FC map: {output_path}")
         return output_path
-
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to process run {fmri_file}: {str(e)}")
         return None
-
 
 def main():
     """Main function to process functional connectivity for all subjects and sessions."""
-    # Extract PCC ROI from networks.nii (label 5 for DefaultMode.PCC)
-    seed_roi = extract_pcc_roi(networks_file)
-
-    for subject in subjects:
-        for session in sessions:
-            try:
-                # Validate paths and get subject-specific mask
-                brain_mask_path = validate_paths(subject, session)
-
-                # Find fMRI and confounds files
-                fmri_files = sorted(glob.glob(os.path.join(
-                    bids_dir, subject, session, 'func',
-                    f'{subject}_{session}_task-rest*_space-MNI152NLin6Asym_desc-preproc_bold.nii.gz'
-                )))
-                confounds_files = sorted(glob.glob(os.path.join(
-                    bids_dir, subject, session, 'func',
-                    f'{subject}_{session}_task-rest*_desc-confounds_timeseries.tsv'
-                )))
-
-                if not fmri_files or not confounds_files:
+    try:
+        seed_roi = extract_pcc_roi(networks_file)
+        for subject in subjects:
+            logger.info(f"Processing subject: {subject}")
+            for session in sessions:
+                try:
+                    logger.info(f"Processing session: {session}")
+                    brain_mask_path = validate_paths(subject, session)
+                    fmri_files = sorted(glob.glob(os.path.join(
+                        bids_dir, subject, session, 'func',
+                        f'{subject}_{session}_task-rest*_space-MNI152NLin6Asym_desc-preproc_bold.nii.gz'
+                    )))
+                    confounds_files = sorted(glob.glob(os.path.join(
+                        bids_dir, subject, session, 'func',
+                        f'{subject}_{session}_task-rest*_desc-confounds_timeseries.tsv'
+                    )))
+                    if not fmri_files or not confounds_files:
+                        logger.warning(f"No fMRI or confounds files found for {subject} {session}")
+                        continue
+                    logger.info(f"Found {len(fmri_files)} fMRI files and {len(confounds_files)} confounds files")
+                    fc_maps = []
+                    for fmri_file, confounds_file in zip(fmri_files, confounds_files):
+                        run_id = fmri_file.split('_run-')[1].split('_')[0] if '_run-' in fmri_file else '1'
+                        output_path = os.path.join(
+                            output_dir,
+                            f'{subject}_{session}_task-rest_run-{run_id}_seed-PCC_fcmap.nii.gz'
+                        )
+                        result = process_run(fmri_file, confounds_file, seed_roi, brain_mask_path, output_path)
+                        if result:
+                            fc_maps.append(result)
+                    if len(fc_maps) > 1:
+                        fc_imgs = [image.load_img(fc_map) for fc_map in fc_maps]
+                        avg_fc_img = image.mean_img(fc_imgs)
+                        avg_output_path = os.path.join(
+                            output_dir,
+                            f'{subject}_{session}_task-rest_seed-PCC_fcmap_avg.nii.gz'
+                        )
+                        avg_fc_img.to_filename(avg_output_path)
+                        logger.info(f"Saved averaged FC map: {avg_output_path}")
+                except Exception as e:
+                    logger.error(f"Failed to process {subject} {session}: {str(e)}")
                     continue
-
-                fc_maps = []
-                for fmri_file, confounds_file in zip(fmri_files, confounds_files):
-                    run_id = fmri_file.split('_run-')[1].split('_')[0] if '_run-' in fmri_file else '1'
-                    output_path = os.path.join(
-                        output_dir,
-                        f'{subject}_{session}_task-rest_run-{run_id}_seed-PCC_fcmap.nii.gz'
-                    )
-                    result = process_run(fmri_file, confounds_file, seed_roi, brain_mask_path, output_path)
-                    if result:
-                        fc_maps.append(result)
-
-                # Average FC maps across runs
-                if len(fc_maps) > 1:
-                    fc_imgs = [image.load_img(fc_map) for fc_map in fc_maps]
-                    avg_fc_img = image.mean_img(fc_imgs)
-                    avg_output_path = os.path.join(
-                        output_dir,
-                        f'{subject}_{session}_task-rest_seed-PCC_fcmap_avg.nii.gz'
-                    )
-                    avg_fc_img.to_filename(avg_output_path)
-
-            except Exception:
-                continue
-
+    except Exception as e:
+        logger.error(f"Main function failed: {str(e)}")
 
 if __name__ == "__main__":
     main()
