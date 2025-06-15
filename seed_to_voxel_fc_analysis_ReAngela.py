@@ -58,21 +58,20 @@ def extract_pcc_roi(networks_file):
     from nipype.interfaces.fsl import FLIRT
     try:
         group_mask_file = os.path.join(roi_dir, 'tpl-MNI152NLin6Asym_res-02_desc-brain_mask.nii.gz')
-        group_mask = image.load_img(group_mask_file)
-        logger.info(f"Loaded group mask: {group_mask_file}")
-        networks_img = image.load_img(networks_file)
-        output_file = 'networks_resampled.nii.gz'
+        pcc_temp_file = os.path.join(work_dir, 'pcc_temp.nii.gz')
+        output_file = os.path.join(work_dir, 'pcc_resampled.nii.gz')
+        pcc_mask = image.index_img(networks_file, 3)
+        pcc_mask.to_filename(pcc_temp_file)
+        # Resample PCC ROI with FLIRT
         flirt = FLIRT()
-        flirt.inputs.in_file = group_mask_file
+        flirt.inputs.in_file = pcc_temp_file
         flirt.inputs.reference = group_mask_file
         flirt.inputs.out_file = output_file
         flirt.inputs.apply_isoxfm = 2
         flirt.inputs.interp = 'nearestneighbour'
         flirt.run()
-        networks_resampled = image.load_img(output_file)
-        pcc_mask = image.index_img(networks_resampled, 3)
-        os.remove(output_file)
-        logger.info("Extracted PCC ROI successfully")
+        logger.info(f"Resampled PCC ROI to {output_file}")
+        pcc_mask = image.load_img(output_file)
         return pcc_mask
     except Exception as e:
         logger.error(f"Failed to extract PCC ROI: {str(e)}")
