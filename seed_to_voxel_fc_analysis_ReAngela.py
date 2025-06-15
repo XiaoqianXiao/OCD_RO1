@@ -137,7 +137,7 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
 def main():
     """Main function to process functional connectivity for all subjects and sessions."""
     try:
-        seed_roi = extract_pcc_roi(networks_file)
+        seed_roi = "/home/xxqian/scratch/roi/pcc_resampled.nii.gz"
         for subject in subjects:
             logger.info(f"Processing subject: {subject}")
             for session in sessions:
