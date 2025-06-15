@@ -63,8 +63,8 @@ def extract_pcc_roi(networks_file):
         networks_img = image.load_img(networks_file)
         output_file = 'networks_resampled.nii.gz'
         flirt = FLIRT()
-        flirt.inputs.in_file = networks_file
-        flirt.inputs.reference = group_mask
+        flirt.inputs.in_file = group_mask_file
+        flirt.inputs.reference = group_mask_file
         flirt.inputs.out_file = output_file
         flirt.inputs.apply_isoxfm = 2
         flirt.inputs.interp = 'nearestneighbour'
