@@ -49,8 +49,8 @@ def validate_paths(subject, session):
 
     # Validate mask path
     if not mask_files:
-        logger.error(f"No mask file found for {subject} {session} at: {mask_pattern}")
-        raise FileNotFoundError(f"No mask file found at: {mask_pattern}")
+        logger.error(f"No mask file found for {subject} {session} at: {mask_files[0]}")
+        raise FileNotFoundError(f"No mask file found at: {mask_files[0]}")
     mask_path = mask_files[0]  # Use the first match, assuming a single mask per subject/session
 
     # Validate networks file
