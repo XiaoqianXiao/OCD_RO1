@@ -137,7 +137,7 @@ def main():
                     )
                     confounds_pattern = os.path.join(
                         bids_dir, subject, session, 'func',
-                        f'{subject}_{session}_task-rest*_desc-confounds_timeseries.tsv'
+                        f'{subject}_{session}_task-rest*_desc-confounds_regressors.tsv'
                     )
                     fmri_files = sorted(glob.glob(fmri_pattern))
                     confounds_files = sorted(glob.glob(confounds_pattern))
