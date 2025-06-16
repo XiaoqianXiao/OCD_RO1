@@ -41,14 +41,24 @@ sessions = ['ses-baseline', 'ses-followup']
 
 def validate_paths(subject, session):
     """Validate input paths exist for subject-specific mask and networks file."""
-    mask_path = os.path.join(
+    mask_pattern = os.path.join(
         bids_dir, subject, session, 'func',
         f'{subject}_{session}*_task-rest_space-MNI152NLin6Asym_desc-brain_mask.nii.gz'
     )
-    for path in [networks_file, mask_path]:
-        if not os.path.exists(path):
-            logger.error(f"Path does not exist for {subject} {session}: {path}")
-            raise FileNotFoundError(f"Path does not exist: {path}")
+    mask_files = glob.glob(mask_pattern)
+
+    # Validate mask path
+    if not mask_files:
+        logger.error(f"No mask file found for {subject} {session} at: {mask_pattern}")
+        raise FileNotFoundError(f"No mask file found at: {mask_pattern}")
+    mask_path = mask_files[0]  # Use the first match, assuming a single mask per subject/session
+
+    # Validate networks file
+    if not os.path.exists(networks_file):
+        logger.error(f"Networks file does not exist for {subject} {session}: {networks_file}")
+        raise FileNotFoundError(f"Networks file not found: {networks_file}")
+
+    # Log successful validation
     logger.info(f"Validated paths for {subject} {session}: mask={mask_path}, networks={networks_file}")
     return mask_path
 
