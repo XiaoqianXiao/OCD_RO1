@@ -87,8 +87,11 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
             mask_img=seed_roi,
             standardize='zscore',
             memory=os.path.join(work_dir, 'nilearn_cache'),
-            memory_level=2,
+            memory_level=1,
             detrend=True,
+            low_pass=0.1,
+            high_pass=0.01,
+            t_r=2.0,
             confounds=motion_params
         )
         seed_time_series = seed_masker.fit_transform(fmri_img)[valid_timepoints]
@@ -97,8 +100,11 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
             mask_img=brain_mask,
             standardize='zscore',
             memory=os.path.join(work_dir, 'nilearn_cache'),
-            memory_level=2,
+            memory_level=1,
             detrend=True,
+            low_pass=0.1,  # Line 139 and 153
+            high_pass=0.01,  # Line 140 and 154
+            t_r=2.0,
             confounds=motion_params
         )
         brain_time_series = brain_masker.fit_transform(fmri_img)[valid_timepoints]

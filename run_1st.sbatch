@@ -2,7 +2,7 @@
 #SBATCH --job-name=seed_to_voxel_analysis
 #SBATCH --account=def-jfeusner
 #SBATCH --time=02:00:00
-#SBATCH --mem=32G
+#SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
 #SBATCH --output=/scratch/xxqian/logs/STV_%A_%a.out
 #SBATCH --error=/scratch/xxqian/logs/STV_%A_%a.err
