@@ -83,7 +83,7 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
             logger.warning(f"Too few valid timepoints ({valid_timepoints.sum()}) for {fmri_file}")
             return None
         motion_params = motion_params[valid_timepoints]
-        seed_masker = masking.NiftiMasker(
+        seed_masker = NiftiMasker(
             mask_img=seed_roi,
             standardize='zscore',
             memory=os.path.join(work_dir, 'nilearn_cache'),
@@ -93,7 +93,7 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
         )
         seed_time_series = seed_masker.fit_transform(fmri_img)[valid_timepoints]
         seed_time_series = np.mean(seed_time_series, axis=1)
-        brain_masker = masking.NiftiMasker(
+        brain_masker = NiftiMasker(  # Line 149 in the updated script
             mask_img=brain_mask,
             standardize='zscore',
             memory=os.path.join(work_dir, 'nilearn_cache'),
