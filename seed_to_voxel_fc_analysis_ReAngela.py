@@ -2,7 +2,8 @@ import os
 import glob
 import re
 import numpy as np
-from nilearn import image, masking
+from nilearn import image
+from nilearn.input_data import NiftiMasker
 import pandas as pd
 import argparse
 import logging
