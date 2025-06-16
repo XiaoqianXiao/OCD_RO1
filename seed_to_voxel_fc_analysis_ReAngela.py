@@ -1,5 +1,6 @@
 import os
 import glob
+import re
 import numpy as np
 from nilearn import image, masking
 import pandas as pd
@@ -7,11 +8,13 @@ import argparse
 import logging
 
 # Set up logging
+log_file = '/scratch/xxqian/OCD/seed_to_voxel_fc_analysis.log'
+os.makedirs(os.path.dirname(log_file), exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/scratch/xxqian/OCD/seed_to_voxel_fc_analysis.log'),
+        logging.FileHandler(log_file),
         logging.StreamHandler()
     ]
 )
@@ -19,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Compute seed-based functional connectivity maps.')
-parser.add_argument('--subject', type=str, required=True, help='Subject ID')
+parser.add_argument('--subject', type=str, required=True, help='Subject ID (e.g., sub-AOCD001)')
 args = parser.parse_args()
 subjects = [args.subject]
 
@@ -35,57 +38,22 @@ roi_dir = os.path.join(scratch_dir, 'roi')
 os.makedirs(output_dir, exist_ok=True)
 os.makedirs(work_dir, exist_ok=True)
 
-# Define path to CONN networks file
-networks_file = os.path.join(roi_dir, 'networks.nii')
+# Define sessions
 sessions = ['ses-baseline', 'ses-followup']
 
 def validate_paths(subject, session):
-    """Validate input paths exist for subject-specific mask and networks file."""
+    """Validate input paths for brain mask in MNI152NLin6Asym space."""
     mask_pattern = os.path.join(
         bids_dir, subject, session, 'func',
-        f'{subject}_{session}*_task-rest_space-MNI152NLin6Asym_desc-brain_mask.nii.gz'
+        f'{subject}_{session}_task-rest*_space-MNI152NLin6Asym_desc-brain_mask.nii.gz'
     )
     mask_files = glob.glob(mask_pattern)
-
-    # Validate mask path
     if not mask_files:
-        logger.error(f"No mask file found for {subject} {session} at: {mask_files[0]}")
-        raise FileNotFoundError(f"No mask file found at: {mask_files[0]}")
-    mask_path = mask_files[0]  # Use the first match, assuming a single mask per subject/session
-
-    # Validate networks file
-    if not os.path.exists(networks_file):
-        logger.error(f"Networks file does not exist for {subject} {session}: {networks_file}")
-        raise FileNotFoundError(f"Networks file not found: {networks_file}")
-
-    # Log successful validation
-    logger.info(f"Validated paths for {subject} {session}: mask={mask_path}, networks={networks_file}")
+        logger.warning(f"No mask file found for {subject} {session} with pattern: {mask_pattern}")
+        return None
+    mask_path = mask_files[0]  # Use first match
+    logger.info(f"Found mask: {mask_path}")
     return mask_path
-
-def extract_pcc_roi(networks_file):
-    """Extract PCC ROI from networks.nii (label 4) and resample to MNI152NLin6Asym space using FLIRT."""
-    from nilearn import image
-    from nipype.interfaces.fsl import FLIRT
-    try:
-        group_mask_file = os.path.join(roi_dir, 'tpl-MNI152NLin6Asym_res-02_desc-brain_mask.nii.gz')
-        pcc_temp_file = os.path.join(work_dir, 'pcc_temp.nii.gz')
-        output_file = os.path.join(work_dir, 'pcc_resampled.nii.gz')
-        pcc_mask = image.index_img(networks_file, 3)
-        pcc_mask.to_filename(pcc_temp_file)
-        # Resample PCC ROI with FLIRT
-        flirt = FLIRT()
-        flirt.inputs.in_file = pcc_temp_file
-        flirt.inputs.reference = group_mask_file
-        flirt.inputs.out_file = output_file
-        flirt.inputs.apply_isoxfm = 2
-        flirt.inputs.interp = 'nearestneighbour'
-        flirt.run()
-        logger.info(f"Resampled PCC ROI to {output_file}")
-        pcc_mask = image.load_img(output_file)
-        return pcc_mask
-    except Exception as e:
-        logger.error(f"Failed to extract PCC ROI: {str(e)}")
-        raise
 
 def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
     """Process a single fMRI run to compute seed-based functional connectivity."""
@@ -147,49 +115,77 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
 def main():
     """Main function to process functional connectivity for all subjects and sessions."""
     try:
-        seed_roi = "/home/xxqian/scratch/roi/pcc_resampled.nii.gz"
+        seed_roi_path = "/home/xxqian/scratch/roi/pcc_resampled.nii.gz"
+        if not os.path.exists(seed_roi_path):
+            logger.error(f"Seed ROI file not found: {seed_roi_path}")
+            raise FileNotFoundError(f"Seed ROI file not found: {seed_roi_path}")
+        seed_roi = image.load_img(seed_roi_path)
+        logger.info(f"Loaded seed ROI: {seed_roi_path}")
+
         for subject in subjects:
             logger.info(f"Processing subject: {subject}")
             for session in sessions:
                 try:
                     logger.info(f"Processing session: {session}")
                     brain_mask_path = validate_paths(subject, session)
-                    fmri_files = sorted(glob.glob(os.path.join(
+                    if not brain_mask_path:
+                        continue
+                    brain_mask = image.load_img(brain_mask_path)
+                    fmri_pattern = os.path.join(
                         bids_dir, subject, session, 'func',
                         f'{subject}_{session}_task-rest*_space-MNI152NLin6Asym_desc-preproc_bold.nii.gz'
-                    )))
-                    confounds_files = sorted(glob.glob(os.path.join(
+                    )
+                    confounds_pattern = os.path.join(
                         bids_dir, subject, session, 'func',
                         f'{subject}_{session}_task-rest*_desc-confounds_timeseries.tsv'
-                    )))
-                    if not fmri_files or not confounds_files:
-                        logger.warning(f"No fMRI or confounds files found for {subject} {session}")
+                    )
+                    fmri_files = sorted(glob.glob(fmri_pattern))
+                    confounds_files = sorted(glob.glob(confounds_pattern))
+                    logger.info(f"Found fMRI files: {fmri_files}")
+                    logger.info(f"Found confounds files: {confounds_files}")
+                    if not fmri_files or not confounds_files or len(fmri_files) != len(confounds_files):
+                        logger.warning(f"Skipping {subject} {session}: No or mismatched fMRI/confounds files")
                         continue
-                    logger.info(f"Found {len(fmri_files)} fMRI files and {len(confounds_files)} confounds files")
                     fc_maps = []
                     for fmri_file, confounds_file in zip(fmri_files, confounds_files):
-                        run_id = fmri_file.split('_run-')[1].split('_')[0] if '_run-' in fmri_file else '1'
-                        output_path = os.path.join(
-                            output_dir,
-                            f'{subject}_{session}_task-rest_run-{run_id}_seed-PCC_fcmap.nii.gz'
-                        )
-                        result = process_run(fmri_file, confounds_file, seed_roi, brain_mask_path, output_path)
-                        if result:
-                            fc_maps.append(result)
-                    if len(fc_maps) > 1:
-                        fc_imgs = [image.load_img(fc_map) for fc_map in fc_maps]
-                        avg_fc_img = image.mean_img(fc_imgs)
-                        avg_output_path = os.path.join(
-                            output_dir,
-                            f'{subject}_{session}_task-rest_seed-PCC_fcmap_avg.nii.gz'
-                        )
-                        avg_fc_img.to_filename(avg_output_path)
-                        logger.info(f"Saved averaged FC map: {avg_output_path}")
+                        try:
+                            # Extract run_id using regex
+                            run_match = re.search(r'_run-(\d+)_', fmri_file)
+                            run_id = run_match.group(1).lstrip('0') or '1' if run_match else '1'
+                            logger.info(f"Parsed run_id={run_id} for fMRI file: {fmri_file}")
+                            output_path = os.path.join(
+                                output_dir,
+                                f'{subject}_{session}_task-rest_run-{run_id}_seed-PCC_fcmap.nii.gz'
+                            )
+                            result = process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path)
+                            if result:
+                                fc_maps.append(result)
+                        except Exception as e:
+                            logger.error(f"Failed to parse or process fMRI file {fmri_file}: {str(e)}")
+                            continue
+                    if fc_maps:
+                        if len(fc_maps) > 1:
+                            fc_imgs = [image.load_img(fc_map) for fc_map in fc_maps]
+                            avg_fc_img = image.mean_img(fc_imgs)
+                            avg_output_path = os.path.join(
+                                output_dir,
+                                f'{subject}_{session}_task-rest_seed-PCC_fcmap_avg.nii.gz'
+                            )
+                            avg_fc_img.to_filename(avg_output_path)
+                            logger.info(f"Saved averaged FC map: {avg_output_path}")
+                        else:
+                            logger.info(f"Single FC map for {subject} {session}: {fc_maps[0]}")
+                    else:
+                        logger.warning(f"No FC maps generated for {subject} {session}")
                 except Exception as e:
                     logger.error(f"Failed to process {subject} {session}: {str(e)}")
                     continue
+            if not any(os.path.exists(os.path.join(output_dir, f'{subject}_{session}_task-rest_seed-PCC_fcmap_avg.nii.gz'))
+                       for session in sessions):
+                logger.error(f"No FC maps generated for {subject}")
     except Exception as e:
-        logger.error(f"Main function failed: {str(e)}")
+        logger.error(f"Main function failed for {subject}: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     main()
