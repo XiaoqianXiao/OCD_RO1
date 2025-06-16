@@ -43,7 +43,7 @@ def validate_paths(subject, session):
     """Validate input paths exist for subject-specific mask and networks file."""
     mask_path = os.path.join(
         bids_dir, subject, session, 'func',
-        f'{subject}_{session}_task-rest_space-MNI152NLin6Asym_desc-brain_mask.nii.gz'
+        f'{subject}_{session}*_task-rest_space-MNI152NLin6Asym_desc-brain_mask.nii.gz'
     )
     for path in [networks_file, mask_path]:
         if not os.path.exists(path):
