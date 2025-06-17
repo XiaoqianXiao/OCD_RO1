@@ -11,23 +11,24 @@
 # Load Apptainer module
 module load apptainer
 
-# Define paths
+# Path to Apptainer container
+CONTAINER="/scratch/xxqian/repo/image/STV_1st_and_group_level.sif"
+
+# Set environment variables
+export FSLOUTPUTTYPE=NIFTI_GZ
+export OMP_NUM_THREADS=8
+
 PROJECT_DIR="/project/6079231/dliang55/R01_AOCD"
-BIDS_DIR="${PROJECT_DIR}/derivatives/fmriprep-1.4.1"
 SCRATCH_DIR="/scratch/xxqian"
 OUTPUT_DIR="${SCRATCH_DIR}/OCD"
-WORK_DIR="${SCRATCH_DIR}/work_flow"
 CONTAINER="${SCRATCH_DIR}/repo/image/STV_1st_and_group_level.sif"
 SUBJECTS_CSV="${PROJECT_DIR}/metadata/shared_demographics.csv"
 CLINICAL_CSV="${SCRATCH_DIR}/OCD/behav/clinical.csv"
 
-# Set environment variables for FSL
-export FSLOUTPUTTYPE=NIFTI_GZ
-export OMP_NUM_THREADS=16
 
+# Bind directories
+APPTAINER_BIND="/scratch/xxqian/work_flow:/scratch, /scratch/xxqian/OCD:/output, /scratch/xxqian/roi:/scratch/xxqian/roi, ${CLINICAL_CSV}:/clinical.csv, ${SUBJECTS_CSV}:/subjects.csv"
 
-# Bind necessary directories to the container
-APPTAINER_BIND="${WORK_DIR}:/scratch,${OUTPUT_DIR}:/output, /scratch/xxqian/roi:/scratch/xxqian/roi, ${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv:ro"
 
 # Run the Python script inside the Apptainer container
 apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER} \
