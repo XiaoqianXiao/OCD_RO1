@@ -15,7 +15,7 @@ parser.add_argument('--work_dir', type=str, required=True)
 args = parser.parse_args()
 
 # Setup
-group_mask_file = '/home/xxqian/scratch/roi/tpl-MNI152NLin6Asym_res-02_desc-brain_mask.nii.gz'
+group_mask_file = "/scratch/xxqian/roi/tpl-MNI152NLin6Asym_res-02_desc-brain_mask.nii.gz"
 os.makedirs(args.work_dir, exist_ok=True)
 os.makedirs(args.output_dir, exist_ok=True)
 
