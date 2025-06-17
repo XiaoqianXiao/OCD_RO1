@@ -8,6 +8,9 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 
+# Load Apptainer module
+module load apptainer
+
 # Define paths
 PROJECT_DIR="/project/6079231/dliang55/R01_AOCD"
 BIDS_DIR="${PROJECT_DIR}/derivatives/fmriprep-1.4.1"
