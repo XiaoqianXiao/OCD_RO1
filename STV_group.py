@@ -67,8 +67,8 @@ def run_voxelwise_regression(input_imgs, y_values, prefix):
     rand.inputs.in_file = masked_path
     rand.inputs.mask = group_mask_file
     rand.inputs.design_mat = mat_file
-    rand.inputs.tcon = con_file  # Fixed: contrast -> tcon
-    rand.inputs.n_perm = 5000
+    rand.inputs.tcon = con_file
+    rand.inputs.num_perm = 5000  # Fixed: n_perm -> num_perm
     rand.inputs.tfce = True
     rand.inputs.out_file = os.path.join(args.output_dir, prefix)
     rand.run()
@@ -206,8 +206,8 @@ if valid_group:
         rand.inputs.in_file = concat_output
         rand.inputs.mask = group_mask_file
         rand.inputs.design_mat = os.path.join(args.work_dir, 'group.mat')
-        rand.inputs.tcon = os.path.join(args.work_dir, 'group.con')  # Fixed: contrast -> tcon
-        rand.inputs.n_perm = 5000
+        rand.inputs.tcon = os.path.join(args.work_dir, 'group.con')
+        rand.inputs.num_perm = 5000  # Fixed: n_perm -> num_perm
         rand.inputs.tfce = True
         rand.inputs.out_file = os.path.join(args.output_dir, 'group_diff_baseline')
         rand.run()
