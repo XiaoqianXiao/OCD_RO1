@@ -108,9 +108,8 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
             confounds=motion_params
         )
         brain_time_series = brain_masker.fit_transform(fmri_img)[valid_timepoints]
-        corr_matrix = np.corrcoef(seed_time_series, brain_time_series.T)
-        fc_map = corr_matrix[0, 1:]
-        fc_map = np.arctanh(fc_map)
+        correlations = np.dot(brain_time_series.T, seed_time_series)
+        fc_map = correlations
         fc_img = brain_masker.inverse_transform(fc_map)
         fc_img.to_filename(output_path)
         logger.info(f"Saved FC map: {output_path}")
