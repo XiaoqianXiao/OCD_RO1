@@ -9,14 +9,14 @@
 #SBATCH --mem=64G
 
 # Define paths
-project_dir = '/project/6079231/dliang55/R01_AOCD'
-bids_dir = os.path.join(project_dir, 'derivatives/fmriprep-1.4.1')
-scratch_dir = '/scratch/xxqian'
-OUTPUT_DIR = os.path.join(scratch_dir, 'OCD')
-WORK_DIR = os.path.join(scratch_dir, 'work_flow')
-CONTAINER="/scratch/xxqian/repo/image/STV_1st_and_group_level.sif"
-SUBJECTS_CSV="/project/6079231/dliang55/R01_AOCD/metadata/shared_demographics.csv"
-Clinical_CSV="/scratch/xxqian/OCD/behav/clinical.csv"
+PROJECT_DIR="/project/6079231/dliang55/R01_AOCD"
+BIDS_DIR="${PROJECT_DIR}/derivatives/fmriprep-1.4.1"
+SCRATCH_DIR="/scratch/xxqian"
+OUTPUT_DIR="${SCRATCH_DIR}/OCD"
+WORK_DIR="${SCRATCH_DIR}/work_flow"
+CONTAINER="${SCRATCH_DIR}/repo/image/STV_1st_and_group_level.sif"
+SUBJECTS_CSV="${PROJECT_DIR}/metadata/shared_demographics.csv"
+CLINICAL_CSV="${SCRATCH_DIR}/OCD/behav/clinical.csv"
 
 # Set environment variables for FSL
 export FSLOUTPUTTYPE=NIFTI_GZ
@@ -24,7 +24,7 @@ export OMP_NUM_THREADS=16
 
 
 # Bind necessary directories to the container
-APPTAINER_BIND="${WORK_DIR}:/scratch,${OUTPUT_DIR}:/output,${Clinical_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv:ro"
+APPTAINER_BIND="${WORK_DIR}:/scratch,${OUTPUT_DIR}:/output,${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv:ro"
 
 # Run the Python script inside the Apptainer container
 apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER} \
