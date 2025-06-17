@@ -24,7 +24,7 @@ export OMP_NUM_THREADS=16
 
 
 # Bind necessary directories to the container
-APPTAINER_BIND="${WORK_DIR}:/scratch,${OUTPUT_DIR}:/output,${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv:ro"
+APPTAINER_BIND="${WORK_DIR}:/scratch,${OUTPUT_DIR}:/output, /scratch/xxqian/roi:/scratch/xxqian/roi, ${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv:ro"
 
 # Run the Python script inside the Apptainer container
 apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER} \
