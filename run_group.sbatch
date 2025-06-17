@@ -44,8 +44,7 @@ if [ ! -f "${MASK_FILE}" ]; then
     exit 1
 fi
 # Run the Python script inside the Apptainer container
-apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER} \
-  python3 /app/STV_group.py \
+apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/STV_group.py \
     --subjects_csv /subjects.csv \
     --clinical_csv /clinical.csv \
     --output_dir /output \
