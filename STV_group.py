@@ -30,13 +30,11 @@ print(f"Subject IDs in CSV: {df['subject_id'].tolist()}")
 
 # Helpers
 def get_fc_path(subject, session):
-    # Handle subject IDs with or without 'sub-' prefix
     if not subject.startswith('sub-'):
         subject = f"sub-{subject}"
     return os.path.join(args.output_dir, f"{subject}_{session}_task-rest_seed-PCC_fcmap_avg.nii.gz")
 
 def get_group(subject):
-    # Handle subject IDs with or without 'sub-' prefix
     if subject.startswith('sub-'):
         subject = subject.replace('sub-', '')
     return df[df['subject_id'] == subject]['group'].iloc[0]
@@ -69,7 +67,7 @@ def run_voxelwise_regression(input_imgs, y_values, prefix):
     rand.inputs.in_file = masked_path
     rand.inputs.mask = group_mask_file
     rand.inputs.design_mat = mat_file
-    rand.inputs.contrast = con_file
+    rand.inputs.tcon = con_file  # Fixed: contrast -> tcon
     rand.inputs.n_perm = 5000
     rand.inputs.tfce = True
     rand.inputs.out_file = os.path.join(args.output_dir, prefix)
@@ -84,8 +82,8 @@ for f in fc_files:
     if '_ses-' in filename and '_task-rest_seed-PCC_fcmap_avg.nii.gz' in filename:
         parts = filename.split('_')
         if len(parts) >= 2:
-            subject = parts[0].replace('sub-', '')  # e.g., AOCD001
-            session = parts[1]  # e.g., ses-baseline
+            subject = parts[0].replace('sub-', '')
+            session = parts[1]
             if subject not in subject_sessions:
                 subject_sessions[subject] = []
             subject_sessions[subject].append(session)
@@ -208,7 +206,7 @@ if valid_group:
         rand.inputs.in_file = concat_output
         rand.inputs.mask = group_mask_file
         rand.inputs.design_mat = os.path.join(args.work_dir, 'group.mat')
-        rand.inputs.contrast = os.path.join(args.work_dir, 'group.con')
+        rand.inputs.tcon = os.path.join(args.work_dir, 'group.con')  # Fixed: contrast -> tcon
         rand.inputs.n_perm = 5000
         rand.inputs.tfce = True
         rand.inputs.out_file = os.path.join(args.output_dir, 'group_diff_baseline')
