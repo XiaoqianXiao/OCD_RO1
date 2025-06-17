@@ -108,7 +108,15 @@ def process_run(fmri_file, confounds_file, seed_roi, brain_mask, output_path):
             confounds=motion_params
         )
         brain_time_series = brain_masker.fit_transform(fmri_img)[valid_timepoints]
-        correlations = np.dot(brain_time_series.T, seed_time_series)
+        # Manual Pearson correlation
+        T = valid_timepoints.sum()  # Number of valid timepoints
+        # Standardize time series (already partially handled by NiftiMasker standardize='zscore', but ensure for clarity)
+        brain_time_series -= brain_time_series.mean(axis=0)
+        seed_time_series -= seed_time_series.mean()
+        brain_time_series /= brain_time_series.std(axis=0)
+        seed_time_series /= seed_time_series.std()
+        # Compute Pearson correlation using dot product
+        correlations = np.dot(brain_time_series.T, seed_time_series) / (T - 1)
         fc_map = correlations
         fc_img = brain_masker.inverse_transform(fc_map)
         fc_img.to_filename(output_path)
