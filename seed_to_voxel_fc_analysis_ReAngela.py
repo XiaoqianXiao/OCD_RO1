@@ -2,6 +2,7 @@ import os
 import glob
 import re
 import numpy as np
+import shutil
 from nilearn import image
 from nilearn.input_data import NiftiMasker
 import pandas as pd
@@ -178,17 +179,19 @@ def main():
                             logger.error(f"Failed to parse or process fMRI file {fmri_file}: {str(e)}")
                             continue
                     if fc_maps:
+                        avg_output_path = os.path.join(
+                            output_dir,
+                            f'{subject}_{session}_task-rest_seed-PCC_fcmap_avg.nii.gz'
+                        )
                         if len(fc_maps) > 1:
                             fc_imgs = [image.load_img(fc_map) for fc_map in fc_maps]
                             avg_fc_img = image.mean_img(fc_imgs)
-                            avg_output_path = os.path.join(
-                                output_dir,
-                                f'{subject}_{session}_task-rest_seed-PCC_fcmap_avg.nii.gz'
-                            )
                             avg_fc_img.to_filename(avg_output_path)
                             logger.info(f"Saved averaged FC map: {avg_output_path}")
                         else:
-                            logger.info(f"Single FC map for {subject} {session}: {fc_maps[0]}")
+                            # Move the single FC map to the avg_output_path
+                            shutil.move(fc_maps[0], avg_output_path)
+                            logger.info(f"Moved single FC map to: {avg_output_path}")
                     else:
                         logger.warning(f"No FC maps generated for {subject} {session}")
                 except Exception as e:
