@@ -68,9 +68,9 @@ def run_voxelwise_regression(input_imgs, y_values, prefix):
     rand.inputs.mask = group_mask_file
     rand.inputs.design_mat = mat_file
     rand.inputs.tcon = con_file
-    rand.inputs.num_perm = 5000  # Fixed: n_perm -> num_perm
+    rand.inputs.num_perm = 5000
     rand.inputs.tfce = True
-    rand.inputs.out_file = os.path.join(args.output_dir, prefix)
+    rand.inputs.base_name = os.path.join(args.output_dir, prefix)  # Fixed: out_file -> base_name
     rand.run()
 
 # Valid subjects: Only include subjects with *fcmap_avg.nii.gz files
@@ -207,9 +207,9 @@ if valid_group:
         rand.inputs.mask = group_mask_file
         rand.inputs.design_mat = os.path.join(args.work_dir, 'group.mat')
         rand.inputs.tcon = os.path.join(args.work_dir, 'group.con')
-        rand.inputs.num_perm = 5000  # Fixed: n_perm -> num_perm
+        rand.inputs.num_perm = 5000
         rand.inputs.tfce = True
-        rand.inputs.out_file = os.path.join(args.output_dir, 'group_diff_baseline')
+        rand.inputs.base_name = os.path.join(args.output_dir, 'group_diff_baseline')  # Fixed: out_file -> base_name
         rand.run()
 
 # Longitudinal analyses
