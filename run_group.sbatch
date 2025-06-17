@@ -28,7 +28,7 @@ APPTAINER_BIND="${WORK_DIR}:/scratch,${OUTPUT_DIR}:/output,${CLINICAL_CSV}:/clin
 
 # Run the Python script inside the Apptainer container
 apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER} \
-  python3 /output/STV_group.py group-level \
+  python3 /app/STV_group.py group-level \
     --subjects_csv /subjects.csv \
     --clinical_csv /clinical.csv \
     --output_dir /output \
