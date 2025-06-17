@@ -66,6 +66,7 @@ for sid in df['subject_id']:
     if all(os.path.exists(get_fc_path(sid, ses)) for ses in sessions):
         valid.append(sid)
 df = df[df['subject_id'].isin(valid)]
+df_clinical = df_clinical[df_clinical['subject_id'].isin(valid)]
 
 # 1. Group diff at baseline
 hc_paths = [get_fc_path(s, 'ses-baseline') for s in df[df['group'] == 'HC']['subject_id']]
