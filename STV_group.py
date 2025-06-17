@@ -4,6 +4,7 @@ import pandas as pd
 from nilearn import image, masking
 from nipype.interfaces.fsl import Randomise, Merge
 import argparse
+import glob
 
 # Arguments
 parser = argparse.ArgumentParser(description='FC analysis: group diffs & symptom prediction')
@@ -60,20 +61,93 @@ def run_voxelwise_regression(input_imgs, y_values, prefix):
     rand.inputs.out_file = os.path.join(args.output_dir, prefix)
     rand.run()
 
-# Valid subjects
+# Valid subjects: Only include subjects with *fcmap_avg.nii.gz files for both sessions
 valid = []
+fc_files = glob.glob(os.path.join(args.output_dir, '*fcmap_avg.nii.gz'))
+subject_sessions = {}
+for f in fc_files:
+    # Extract subject ID and session from filename (e.g., sub-AOCD002_ses-baseline_task-rest_seed-PCC_fcmap_avg.nii.gz)
+    filename = os.path.basename(f)
+    if '_ses-' in filename and '_task-rest_seed-PCC_fcmap_avg.nii.gz' in filename:
+        parts = filename.split('_')
+        if len(parts) >= 2:
+            subject = parts[0]  # e.g., sub-AOCD002
+            session = parts[1]  # e.g., ses-baseline
+            if subject not in subject_sessions:
+                subject_sessions[subject] = []
+            subject_sessions[subject].append(session)
+
+# Filter subjects with files for both sessions
 for sid in df['subject_id']:
-    if all(os.path.exists(get_fc_path(sid, ses)) for ses in sessions):
+    if sid in subject_sessions and all(ses in subject_sessions[sid] for ses in sessions):
         valid.append(sid)
+
+if not valid:
+    raise ValueError("No subjects found with *fcmap_avg.nii.gz files for both sessions")
+
 df = df[df['subject_id'].isin(valid)]
 df_clinical = df_clinical[df_clinical['subject_id'].isin(valid)]
+print(f"Valid subjects included: {valid}")
 
 # 1. Group diff at baseline
 hc_paths = [get_fc_path(s, 'ses-baseline') for s in df[df['group'] == 'HC']['subject_id']]
 ocd_paths = [get_fc_path(s, 'ses-baseline') for s in df[df['group'] == 'OCD']['subject_id']]
 
-Merge(in_files=hc_paths, dimension='t', merged_file=os.path.join(args.output_dir, 'hc_baseline_4d.nii.gz')).run()
-Merge(in_files=ocd_paths, dimension='t', merged_file=os.path.join(args.output_dir, 'ocd_baseline_4d.nii.gz')).run()
+# Validate input files
+print("Validating HC input files:")
+for path in hc_paths:
+    if not os.path.exists(path):
+        print(f"Error: Missing file: {path}")
+    else:
+        print(f"Found: {path}")
+if not hc_paths:
+    raise ValueError("No HC input files found")
+print("Validating OCD input files:")
+for path in ocd_paths:
+    if not os.path.exists(path):
+        print(f"Error: Missing file: {path}")
+    else:
+        print(f"Found: {path}")
+if not ocd_paths:
+    raise ValueError("No OCD input files found")
+
+# Verify directories
+if not os.path.exists(args.output_dir):
+    raise FileNotFoundError(f"Output directory does not exist: {args.output_dir}")
+if not os.access(args.output_dir, os.W_OK):
+    raise PermissionError(f"Cannot write to output directory: {args.output_dir}")
+print(f"Output directory is writable: {args.output_dir}")
+if not os.path.exists(args.work_dir):
+    raise FileNotFoundError(f"Work directory does not exist: {args.work_dir}")
+if not os.access(args.work_dir, os.W_OK):
+    raise PermissionError(f"Cannot write to work directory: {args.work_dir}")
+print(f"Work directory is writable: {args.work_dir}")
+
+# Merge HC files
+hc_output = os.path.join(args.output_dir, 'hc_baseline_4d.nii.gz')
+print(f"Merging HC files to: {hc_output}")
+try:
+    merger = Merge(in_files=hc_paths, dimension='t', merged_file=hc_output)
+    merger.run()
+    if not os.path.exists(hc_output):
+        raise FileNotFoundError(f"Merged HC file not created: {hc_output}")
+    print(f"Successfully created: {hc_output}")
+except Exception as e:
+    print(f"Error during HC merge: {e}")
+    raise
+
+# Merge OCD files
+ocd_output = os.path.join(args.output_dir, 'ocd_baseline_4d.nii.gz')
+print(f"Merging OCD files to: {ocd_output}")
+try:
+    merger = Merge(in_files=ocd_paths, dimension='t', merged_file=ocd_output)
+    merger.run()
+    if not os.path.exists(ocd_output):
+        raise FileNotFoundError(f"Merged OCD file not not created: {ocd_output}")
+    print(f"Successfully created: {ocd_output}")
+except Exception as e:
+    print(f"Error during OCD merge: {e}")
+    raise
 
 # Create mat/con for group diff
 with open(os.path.join(args.work_dir, 'group.mat'), 'w') as f:
@@ -84,7 +158,7 @@ with open(os.path.join(args.work_dir, 'group.con'), 'w') as f:
 
 # Merge and run group difference
 Merge(in_files=ocd_paths + hc_paths, dimension='t',
-      merged_file=os.path.join(args.output_dir, 'group_baseline_concat.nii.gz')).run()
+      merged_file=os.path.join(args.output_dir, 'group_baseline_concat.nio.gz')).run()
 
 rand = Randomise()
 rand.inputs.in_file = os.path.join(args.output_dir, 'group_baseline_concat.nii.gz')
