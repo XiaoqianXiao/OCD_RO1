@@ -24,7 +24,7 @@ if [ ${#SUBJECTS[@]} -eq 0 ]; then
 fi
 
 # Create a temporary directory for SLURM job scripts
-TEMP_JOB_DIR="$OUTPUT_DIR/slurm_jobs"
+TEMP_JOB_DIR="/scratch/xxqian/slurm_jobs"
 mkdir -p "$TEMP_JOB_DIR"
 
 # Loop over subjects and submit a job for each
