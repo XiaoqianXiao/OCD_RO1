@@ -6,7 +6,6 @@ import pandas as pd
 from nilearn import image
 from nilearn.input_data import NiftiLabelsMasker
 from nilearn.datasets import fetch_coords_power_2011, load_mni152_template
-from nilearn.image import resample_to_img
 import argparse
 import logging
 from itertools import combinations
@@ -45,22 +44,25 @@ os.makedirs(work_dir, exist_ok=True)
 # Define sessions
 sessions = ['ses-baseline', 'ses-followup']
 
-# Load or generate Power 2011 atlas
+# Load Power 2011 atlas
 power_atlas_path = os.path.join(roi_dir, 'power_2011_atlas.nii.gz')
 if not os.path.exists(power_atlas_path):
     logger.info("Generating Power 2011 atlas from coordinates")
     power = fetch_coords_power_2011()
+    # Verify recarray fields
     required_fields = ['roi', 'x', 'y', 'z']
     if not all(field in power.rois.dtype.names for field in required_fields):
         logger.error(f"Power.rois missing required fields {required_fields}: {power.rois.dtype.names}")
         raise ValueError("Invalid Power 2011 atlas data structure")
+    # Extract x, y, z coordinates as a NumPy array
     coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T
     logger.info(f"Power 2011 coordinates shape: {coords.shape} (expected: (264, 3))")
+    logger.info(f"Sample coordinates: {coords[:5].tolist()}")
     template = load_mni152_template(resolution=2)
     atlas_data = np.zeros(template.shape, dtype=np.int32)
     for idx, coord in enumerate(coords):
         try:
-            x, y, z = coord
+            x, y, z = coord  # Unpack exactly three values
             logger.debug(f"Processing ROI {idx + 1}: ({x}, {y}, {z})")
             voxel_coords = np.round(np.linalg.inv(template.affine).dot([x, y, z, 1])[:3]).astype(int)
             xx, yy, zz = np.ogrid[-3:4, -3:4, -3:4]
@@ -84,13 +86,11 @@ if not os.path.exists(power_atlas_path):
     power_atlas.to_filename(power_atlas_path)
     logger.info(f"Generated Power 2011 atlas saved to {power_atlas_path}")
 
-# Load atlas and verify
-atlas = image.load_img(power_atlas_path)
-logger.info(f"Loaded Power 2011 atlas: {power_atlas_path}, shape: {atlas.shape}, affine: {atlas.affine.tolist()}")
-
 # Load network labels and coordinates
 power = fetch_coords_power_2011()
 n_rois = len(power.rois)  # 264 ROIs
+logger.info(f"Power atlas comes with {power.keys()}.")
+# Verify power.rois is a recarray with expected fields
 required_fields = ['roi', 'x', 'y', 'z']
 if not all(field in power.rois.dtype.names for field in required_fields):
     logger.error(f"Power.rois missing required fields {required_fields}: {power.rois.dtype.names}")
@@ -108,9 +108,10 @@ try:
     if len(network_labels_list) != n_rois:
         logger.error(f"Network labels file has {len(network_labels_list)} entries, expected {n_rois}")
         raise ValueError(f"Invalid number of network labels in {network_labels_path}")
+    # Parse network names and validate ROI numbers
     network_labels = {}
     for i, (label, roi_num) in enumerate(zip(network_labels_list, power.rois['roi'])):
-        parts = label.rsplit('_', 1)
+        parts = label.rsplit('_', 1)  # Split at last underscore
         if len(parts) != 2:
             logger.error(f"Invalid label format in {network_labels_path} at line {i+1}: {label}")
             raise ValueError(f"Invalid label format: {label}")
@@ -123,71 +124,50 @@ try:
         if txt_roi_num != roi_num:
             logger.error(f"ROI number mismatch in {network_labels_path} at line {i+1}: {txt_roi_num} != {roi_num}")
             raise ValueError(f"ROI number mismatch: {txt_roi_num} != {roi_num}")
-        network_labels[i + 1] = network_name
+        network_labels[i + 1] = network_name  # 1-based indexing
     logger.info(f"Loaded {len(network_labels)} network labels from {network_labels_path}")
+    logger.debug(f"Sample network labels: {list(network_labels.items())[:5]}")
 except Exception as e:
     logger.error(f"Failed to load network labels from {network_labels_path}: {str(e)}")
     raise
-coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T
-roi_names = [f"ROI_{i+1}" for i in range(n_rois)]
+coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T  # Extract coordinates
+roi_names = [f"ROI_{i+1}" for i in range(n_rois)]  # Simple ROI names
 
 def validate_paths(subject, session):
-    """Validate and return paths for fMRI and brain mask."""
+    """Validate input paths for brain mask in MNI152NLin6Asym space."""
     mask_pattern = os.path.join(
         bids_dir, subject, session, 'func',
         f'{subject}_{session}_task-rest*_space-MNI152NLin6Asym_desc-brain_mask.nii.gz'
     )
-    fmri_pattern = os.path.join(
-        bids_dir, subject, session, 'func',
-        f'{subject}_{session}_task-rest*_space-MNI152NLin6Asym_desc-preproc_bold.nii.gz'
-    )
     mask_files = glob.glob(mask_pattern)
-    fmri_files = glob.glob(fmri_pattern)
     if not mask_files:
         logger.warning(f"No mask file found for {subject} {session} with pattern: {mask_pattern}")
-        return None, None
-    if not fmri_files:
-        logger.warning(f"No fMRI file found for {subject} {session} with pattern: {fmri_pattern}")
-        return None, None
+        return None
     mask_path = mask_files[0]
-    fmri_path = fmri_files[0]  # Use first match
-    logger.info(f"Found mask: {mask_path}, fMRI: {fmri_path}")
-    return mask_path, fmri_path
-
-def resample_to_atlas_space(img, target_img, output_path, interpolation='continuous'):
-    """Resample an image to the space of the target image."""
-    try:
-        resampled_img = resample_to_img(img, target_img, interpolation=interpolation)
-        resampled_img.to_filename(output_path)
-        logger.info(f"Resampled image to {output_path}, shape: {resampled_img.shape}, affine: {resampled_img.affine.tolist()}")
-        return resampled_img
-    except Exception as e:
-        logger.error(f"Failed to resample image to {output_path}: {str(e)}")
-        raise
+    logger.info(f"Found mask: {mask_path}")
+    return mask_path
 
 def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
     """Process a single fMRI run to compute ROI-to-ROI functional connectivity."""
     try:
         logger.info(f"Processing run: fMRI={fmri_file}, confounds={confounds_file}, output={output_prefix}")
-        # Resample fMRI and mask to atlas space
         fmri_img = image.load_img(fmri_file)
-        brain_mask_img = image.load_img(brain_mask)
-        fmri_resampled_path = os.path.join(work_dir, f"{output_prefix}_resampled_fmri.nii.gz")
-        mask_resampled_path = os.path.join(work_dir, f"{output_prefix}_resampled_mask.nii.gz")
-        fmri_img = resample_to_atlas_space(fmri_img, atlas, fmri_resampled_path, interpolation='continuous')
-        brain_mask_img = resample_to_atlas_space(brain_mask_img, atlas, mask_resampled_path, interpolation='nearest')
-
-        # Load confounds
         confounds_df = pd.read_csv(confounds_file, sep='\t')
-        compcor_cols = [col for col in confounds_df.columns if 'a_compcor' in col][:5]  # Top 5 aCompCor
-        motion_params = confounds_df[compcor_cols + [
+        motion_params = confounds_df[[
             'trans_x', 'trans_y', 'trans_z',
             'rot_x', 'rot_y', 'rot_z',
             'trans_x_derivative1', 'trans_y_derivative1', 'trans_z_derivative1',
             'rot_x_derivative1', 'rot_y_derivative1', 'rot_z_derivative1'
         ]].fillna(0)
         fd_flags = confounds_df['framewise_displacement'].fillna(0) > 0.5
-        art_flags = fd_flags  # Simplified; add global signal if needed
+        if 'global_signal' in confounds_df.columns:
+            global_signal = confounds_df['global_signal'].fillna(confounds_df['global_signal'].mean())
+            gs_z_scores = np.abs((global_signal - global_signal.mean()) / global_signal.std())
+            gs_flags = gs_z_scores > 3
+            art_flags = fd_flags | gs_flags
+        else:
+            art_flags = fd_flags
+            logger.warning("Global signal not found in confounds; using FD flags only")
         valid_timepoints = ~art_flags
         logger.info(f"Valid timepoints: {valid_timepoints.sum()}/{len(valid_timepoints)}")
         if valid_timepoints.sum() < 10:
@@ -197,7 +177,7 @@ def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
         # Extract ROI time series
         masker = NiftiLabelsMasker(
             labels_img=atlas,
-            mask_img=brain_mask_img,
+            mask_img=brain_mask,
             standardize='zscore',
             memory=os.path.join(work_dir, 'nilearn_cache'),
             memory_level=1,
@@ -251,7 +231,7 @@ def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
         pd.DataFrame(roi_fc).to_csv(output_roi_csv, index=False)
         logger.info(f"Saved ROI-level FC: {output_roi_csv}")
 
-        # Compute network-level FC
+        # Compute network-level FC (previous functionality)
         unique_networks = sorted(set(network_labels.values()) - {'Unknown'})
         network_fc = {net: {'within': [], 'between': {net2: [] for net2 in unique_networks if net2 != net}}
                       for net in unique_networks}
@@ -273,7 +253,7 @@ def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
             row = {'Network': net, 'Within_Network_FC': within_mean}
             for other_net in network_fc[net]['between']:
                 between_mean = np.mean(network_fc[net]['between'][other_net]) if network_fc[net]['between'][other_net] else np.nan
-                row[f'Between_{other_net}_FC'] = between_mean
+                row[f'Between_{other_net}_ doFC'] = between_mean
             network_summary.append(row)
 
         output_network_csv = f"{output_prefix}_network_fc.csv"
@@ -288,6 +268,7 @@ def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
 def main():
     """Main function to process ROI-to-ROI functional connectivity for all subjects and sessions."""
     try:
+        atlas = image.load_img(power_atlas_path)
         logger.info(f"Loaded Power 2011 atlas: {power_atlas_path}")
 
         for subject in subjects:
@@ -295,31 +276,81 @@ def main():
             for session in sessions:
                 try:
                     logger.info(f"Processing session: {session}")
-                    brain_mask_path, fmri_file = validate_paths(subject, session)
-                    if not brain_mask_path or not fmri_file:
+                    brain_mask_path = validate_paths(subject, session)
+                    if not brain_mask_path:
                         continue
-                    results = []
+                    brain_mask = image.load_img(brain_mask_path)
+                    fmri_pattern = os.path.join(
+                        bids_dir, subject, session, 'func',
+                        f'{subject}_{session}_task-rest*_space-MNI152NLin6Asym_desc-preproc_bold.nii.gz'
+                    )
                     confounds_pattern = os.path.join(
                         bids_dir, subject, session, 'func',
                         f'{subject}_{session}_task-rest*_desc-confounds_regressors.tsv'
                     )
+                    fmri_files = sorted(glob.glob(fmri_pattern))
                     confounds_files = sorted(glob.glob(confounds_pattern))
-                    if not confounds_files:
-                        logger.warning(f"No confounds file found for {subject} {session}")
+                    logger.info(f"Found fMRI files: {fmri_files}")
+                    logger.info(f"Found confounds files: {confounds_files}")
+                    if not fmri_files or not confounds_files or len(fmri_files) != len(confounds_files):
+                        logger.warning(f"Skipping {subject} {session}: No or mismatched fMRI/confounds files")
                         continue
-                    confounds_file = confounds_files[0]  # Use first match
-                    logger.info(f"Found confounds file: {confounds_file}")
-                    run_match = re.search(r'_run-(\d+)_', fmri_file)
-                    run_id = run_match.group(1).lstrip('0') or '1' if run_match else '1'
-                    logger.info(f"Parsed run_id={run_id} for fMRI file: {fmri_file}")
-                    output_prefix = os.path.join(
-                        output_dir,
-                        f'{subject}_{session}_task-rest_run-{run_id}_power2011'
-                    )
-                    result = process_run(fmri_file, confounds_file, atlas, brain_mask_path, output_prefix)
-                    if result:
-                        results.append(result)
-                    if results:
+                    results = []
+                    for fmri_file, confounds_file in zip(fmri_files, confounds_files):
+                        try:
+                            run_match = re.search(r'_run-(\d+)_', fmri_file)
+                            run_id = run_match.group(1).lstrip('0') or '1' if run_match else '1'
+                            logger.info(f"Parsed run_id={run_id} for fMRI file: {fmri_file}")
+                            output_prefix = os.path.join(
+                                output_dir,
+                                f'{subject}_{session}_task-rest_run-{run_id}_power2011'
+                            )
+                            result = process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix)
+                            if result:
+                                results.append(result)
+                        except Exception as e:
+                            logger.error(f"Failed to parse or process fMRI file {fmri_file}: {str(e)}")
+                            continue
+                    if results and len(results) > 1:
+                        # Average correlation matrices
+                        matrices = [np.load(result[0]) for result in results]
+                        avg_matrix = np.mean(matrices, axis=0)
+                        avg_matrix_output = os.path.join(
+                            output_dir,
+                            f'{subject}_{session}_task-rest_power2011_roiroi_matrix_avg.npy'
+                        )
+                        np.save(avg_matrix_output, avg_matrix)
+                        logger.info(f"Saved averaged correlation matrix: {avg_matrix_output}")
+
+                        # Average ROI-level FC
+                        roi_dfs = [pd.read_csv(result[1]) for result in results]
+                        avg_roi_df = pd.DataFrame({
+                            'network_name': roi_dfs[0]['network_name'],
+                            'roi_name': roi_dfs[0]['roi_name'],
+                            'within_network_FC': np.mean([df['within_network_FC'] for df in roi_dfs], axis=0),
+                            'between_network_FC': np.mean([df['between_network_FC'] for df in roi_dfs], axis=0)
+                        })
+                        avg_roi_csv = os.path.join(
+                            output_dir,
+                            f'{subject}_{session}_task-rest_power2011_roi_fc_avg.csv'
+                        )
+                        avg_roi_df.to_csv(avg_roi_csv, index=False)
+                        logger.info(f"Saved averaged ROI-level FC: {avg_roi_csv}")
+
+                        # Average network-level FC
+                        network_dfs = [pd.read_csv(result[2]) for result in results]
+                        avg_network_df = pd.DataFrame({
+                            col: np.mean([df[col] for df in network_dfs], axis=0) if col != 'Network' else network_dfs[0]['Network']
+                            for col in network_dfs[0].columns
+                        })
+                        avg_network_csv = os.path.join(
+                            output_dir,
+                            f'{subject}_{session}_task-rest_power2011_network_fc_avg.csv'
+                        )
+                        avg_network_df.to_csv(avg_network_csv, index=False)
+                        logger.info(f"Saved averaged network FC: {avg_network_csv}")
+                    elif results:
+                        # Move single run outputs to avg paths
                         src_matrix, src_roi_csv, src_network_csv = results[0]
                         avg_matrix_output = os.path.join(
                             output_dir,
