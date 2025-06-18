@@ -50,9 +50,9 @@ if not os.path.exists(power_atlas_path):
     logger.info("Generating Power 2011 atlas from coordinates")
     power = fetch_coords_power_2011()
     # Verify recarray fields
-    required_fields = ['x', 'y', 'z']
+    required_fields = ['roi', 'x', 'y', 'z']
     if not all(field in power.rois.dtype.names for field in required_fields):
-        logger.error(f"Power 2011 rois recarray missing required fields: {required_fields}")
+        logger.error(f"Power.rois missing required fields {required_fields}: {power.rois.dtype.names}")
         raise ValueError("Invalid Power 2011 atlas data structure")
     # Extract x, y, z coordinates as a NumPy array
     coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T
@@ -90,11 +90,12 @@ if not os.path.exists(power_atlas_path):
 power = fetch_coords_power_2011()
 n_rois = len(power.rois)  # 264 ROIs
 logger.info(f"Power atlas comes with {power.keys()}.")
-# Verify power.rois is a DataFrame with expected columns
-if not isinstance(power.rois, pd.DataFrame) or not all(col in power.rois.columns for col in ['roi', 'x', 'y', 'z']):
-    logger.error(f"Power.rois is not a DataFrame with columns ['roi', 'x', 'y', 'z']: {power.rois}")
+# Verify power.rois is a recarray with expected fields
+required_fields = ['roi', 'x', 'y', 'z']
+if not all(field in power.rois.dtype.names for field in required_fields):
+    logger.error(f"Power.rois missing required fields {required_fields}: {power.rois.dtype.names}")
     raise ValueError("Invalid Power 2011 atlas data structure")
-if power.rois['roi'].tolist() != list(range(1, n_rois + 1)):
+if not np.array_equal(power.rois['roi'], np.arange(1, n_rois + 1)):
     logger.error("Power.rois['roi'] does not contain 1–264 in order")
     raise ValueError("Invalid ROI numbers in power.rois")
 network_labels_path = os.path.join(roi_dir, 'power264', 'power264NodeNames.txt')
@@ -107,7 +108,7 @@ try:
     if len(network_labels_list) != n_rois:
         logger.error(f"Network labels file has {len(network_labels_list)} entries, expected {n_rois}")
         raise ValueError(f"Invalid number of network labels in {network_labels_path}")
-    # Parse network names and ROI numbers
+    # Parse network names and validate ROI numbers
     network_labels = {}
     for i, (label, roi_num) in enumerate(zip(network_labels_list, power.rois['roi'])):
         parts = label.rsplit('_', 1)  # Split at last underscore
@@ -129,7 +130,7 @@ try:
 except Exception as e:
     logger.error(f"Failed to load network labels from {network_labels_path}: {str(e)}")
     raise
-coords = power.rois[['x', 'y', 'z']].to_numpy()  # Extract coordinates as NumPy array
+coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T  # Extract coordinates
 roi_names = [f"ROI_{i+1}" for i in range(n_rois)]  # Simple ROI names
 
 def validate_paths(subject, session):
