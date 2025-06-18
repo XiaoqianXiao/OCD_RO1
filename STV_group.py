@@ -75,7 +75,7 @@ def run_voxelwise_regression(input_imgs, y_values, prefix):
     rand.run()
 
 # Valid subjects: Only include subjects with *fcmap_avg.nii.gz files
-fc_files = glob.glob(os.path.join(args.output_dir, '*fcmap_avg.nii.gz'))
+fc_files = glob.glob(os.path.join(args.output_dir, 'STV_1stLevel/*fcmap_avg.nii.gz'))
 print(f"Found {len(fc_files)} *fcmap_avg.nii.gz files: {fc_files}")
 subject_sessions = {}
 for f in fc_files:
