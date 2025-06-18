@@ -14,8 +14,8 @@ sbatch --array=0-$N << 'EOF'
 #SBATCH --time=02:00:00
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
-#SBATCH --output=/scratch/xxqian/logs/STV_%A_%a.out
-#SBATCH --error=/scratch/xxqian/logs/STV_%A_%a.err
+#SBATCH --output=/scratch/xxqian/logs/STV_1st_%A_%a.out
+#SBATCH --error=/scratch/xxqian/logs/STV_1st_%A_%a.err
 
 # Load Apptainer module
 module load apptainer

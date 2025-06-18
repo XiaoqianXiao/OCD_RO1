@@ -36,15 +36,15 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     cat > "$JOB_SCRIPT" << EOF
 #!/bin/bash
 #SBATCH --job-name=$JOB_NAME
-#SBATCH --output=$OUTPUT_DIR/slurm_logs/%x_%j.out
-#SBATCH --error=$OUTPUT_DIR/slurm_logs/%x_%j.err
+#SBATCH --output=/scratch/xxqian/logs/NW_1st_%x_%j.out
+#SBATCH --error=/scratch/xxqian/logs/NW_1st_%x_%j.err
 #SBATCH --mem=8G
 #SBATCH --time=01:00:00
 #SBATCH --cpus-per-task=1
 #SBATCH --account=def-jfeusner
 
 # Load Apptainer module (adjust module name if needed)
-module load apptainer/1.2.2
+module load apptainer
 
 # Create output log directory
 mkdir -p $OUTPUT_DIR/slurm_logs

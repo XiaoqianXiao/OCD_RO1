@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=mixed_anova_pcc
-#SBATCH --output=STVGroup_%A_%a.out
-#SBATCH --error=STVGroup_%A_%a.err
+#SBATCH --output=/scratch/xxqian/logs/STVGroup_%A_%a.out
+#SBATCH --error=/scratch/xxqian/logs/STVGroup_%A_%a.err
 #SBATCH --time=02:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
