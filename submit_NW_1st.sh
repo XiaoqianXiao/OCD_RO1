@@ -26,7 +26,7 @@ if [ ${#SUBJECTS[@]} -eq 0 ]; then
 fi
 
 # Define bind paths for Apptainer, avoiding redundant mounts
-APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian:/scratch/xxqian"
+APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian:/scratch/xxqian, /scratch/xxqian/NW_1st.py:/app/NW_1st.py"
 
 # Verify bind paths
 for path in "/project/6079231/dliang55/R01_AOCD" "/scratch/xxqian"; do

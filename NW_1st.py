@@ -49,14 +49,22 @@ power_atlas_path = os.path.join(roi_dir, 'power_2011_atlas.nii.gz')
 if not os.path.exists(power_atlas_path):
     logger.info("Generating Power 2011 atlas from coordinates")
     power = fetch_coords_power_2011()
-    coords = power.rois
+    # Extract x, y, z coordinates as a NumPy array
+    if not all(col in power.rois.columns for col in ['x', 'y', 'z']):
+        logger.error("Power 2011 rois DataFrame missing required columns: x, y, z")
+        raise ValueError("Invalid Power 2011 atlas data structure")
+    coords = power.rois[['x', 'y', 'z']].to_numpy()
+    logger.info(f"Power 2011 coordinates shape: {coords.shape} (expected: (264, 3))")
+    logger.info(f"Sample coordinates: {coords[:5].tolist()}")
     template = load_mni152_template(resolution=2)
     atlas_data = np.zeros(template.shape, dtype=np.int32)
-    for idx, (x, y, z) in enumerate(coords):
-        voxel_coords = np.round(np.linalg.inv(template.affine).dot([x, y, z, 1])[:3]).astype(int)
-        xx, yy, zz = np.ogrid[-3:4, -3:4, -3:4]
-        sphere = (xx**2 + yy**2 + zz**2 <= 3**2).astype(int)
+    for idx, coord in enumerate(coords):
         try:
+            x, y, z = coord  # Unpack exactly three values
+            logger.debug(f"Processing ROI {idx + 1}: ({x}, {y}, {z})")
+            voxel_coords = np.round(np.linalg.inv(template.affine).dot([x, y, z, 1])[:3]).astype(int)
+            xx, yy, zz = np.ogrid[-3:4, -3:4, -3:4]
+            sphere = (xx**2 + yy**2 + zz**2 <= 3**2).astype(int)
             atlas_data[
                 voxel_coords[0]-3:voxel_coords[0]+4,
                 voxel_coords[1]-3:voxel_coords[1]+4,
@@ -66,8 +74,12 @@ if not os.path.exists(power_atlas_path):
                 voxel_coords[1]-3:voxel_coords[1]+4,
                 voxel_coords[2]-3:voxel_coords[2]+4
             ], (idx + 1) * sphere)
-        except IndexError:
+        except (ValueError, IndexError) as e:
+            logger.error(f"Skipping invalid coordinate at index {idx}: {coord}, error: {str(e)}")
             continue
+    if np.all(atlas_data == 0):
+        logger.error("Failed to generate atlas: all data is zero")
+        raise ValueError("Atlas generation produced empty data")
     power_atlas = image.new_img_like(template, atlas_data)
     power_atlas.to_filename(power_atlas_path)
     logger.info(f"Generated Power 2011 atlas saved to {power_atlas_path}")
@@ -75,7 +87,7 @@ if not os.path.exists(power_atlas_path):
 # Load network labels and coordinates
 power = fetch_coords_power_2011()
 network_labels = {i + 1: net for i, net in enumerate(power.networks)}  # 1-based indexing
-coords = power.rois
+coords = power.rois[['x', 'y', 'z']].to_numpy()  # Consistent coordinate extraction
 n_rois = len(power.rois)  # 264 ROIs
 roi_names = [f"ROI_{i+1}" for i in range(n_rois)]  # Simple ROI names
 
