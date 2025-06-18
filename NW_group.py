@@ -7,19 +7,6 @@ from statsmodels.stats.multitest import fdrcorrection
 import argparse
 import logging
 
-# Set up logging
-log_file = '/scratch/xxqian/OCD/seed_to_voxel_fc_analysis.log'
-#log_file = '/output/logs/NW_group.log'
-os.makedirs(os.path.dirname(log_file), exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Network-level FC group analysis')
@@ -38,7 +25,6 @@ df = df[df['group'].isin(['HC', 'OCD'])]
 df_clinical = pd.read_csv(args.clinical_csv)
 df_clinical['subject_id'] = df_clinical['sub'].astype(str)
 sessions = ['ses-baseline', 'ses-followup']
-logger.info(f"Subject IDs in CSV: {df['subject_id'].tolist()}")
 
 
 # Helpers
@@ -64,7 +50,6 @@ def run_ttest(fc_data_hc, fc_data_ocd, columns):
         hc_values = fc_data_hc[col].dropna()
         ocd_values = fc_data_ocd[col].dropna()
         if len(hc_values) < 2 or len(ocd_values) < 2:
-            logger.warning(f"Skipping {col}: Insufficient data (HC: {len(hc_values)}, OCD: {len(ocd_values)})")
             continue
         t_stat, p_val = stats.ttest_ind(ocd_values, hc_values, equal_var=False)  # Welch's t-test
         results.append({
@@ -92,7 +77,6 @@ def run_regression(fc_data, y_values, columns):
         x = fc_data[col].dropna()
         y = y_values.loc[x.index].dropna()
         if len(x) < 2 or len(y) < 2:
-            logger.warning(f"Skipping {col}: Insufficient data (n={len(x)})")
             continue
         x = x.values.reshape(-1, 1)
         y = y.values
@@ -126,26 +110,16 @@ for f in fc_files:
         if subject not in subject_sessions:
             subject_sessions[subject] = []
         subject_sessions[subject].append(session)
-logger.info(f"Subject sessions: {subject_sessions}")
 
 csv_subjects = set(df['subject_id'])
 file_subjects = set(subject_sessions.keys())
 unmatched = file_subjects - csv_subjects
-if unmatched:
-    logger.warning(f"Found files for subjects not in subjects_csv: {unmatched}")
-
 valid_group = [sid for sid in df['subject_id'] if
                sid.replace('sub-', '') in subject_sessions and 'ses-baseline' in subject_sessions[
                    sid.replace('sub-', '')]]
 valid_longitudinal = [sid for sid in df['subject_id'] if sid.replace('sub-', '') in subject_sessions and all(
     ses in subject_sessions[sid.replace('sub-', '')] for ses in sessions)]
-logger.info(f"Valid subjects for group analysis: {valid_group}")
-logger.info(f"Valid subjects for longitudinal analysis: {valid_longitudinal}")
 
-if not valid_group:
-    logger.warning("No subjects found for group analysis. Skipping.")
-if not valid_longitudinal:
-    logger.warning("No subjects found for longitudinal analysis. Skipping.")
 
 # Filter DataFrames
 df = df[df['subject_id'].isin(valid_group)]
@@ -162,8 +136,6 @@ for sid in valid_group:
             network_columns = [col for col in fc_df.columns if col != 'Network']
         fc_df['subject_id'] = sid
         baseline_fc_data.append(fc_df)
-    else:
-        logger.warning(f"Missing baseline FC file: {fc_path}")
 baseline_fc_data = pd.concat(baseline_fc_data, ignore_index=True) if baseline_fc_data else pd.DataFrame()
 
 # 1. Group difference at baseline
@@ -174,9 +146,7 @@ if valid_group and not baseline_fc_data.empty:
         ttest_results = run_ttest(hc_data, ocd_data, network_columns)
         ttest_output = os.path.join(args.output_dir, 'group_diff_baseline_network_fc.csv')
         ttest_results.to_csv(ttest_output, index=False)
-        logger.info(f"Saved group difference results: {ttest_output}")
-    else:
-        logger.warning("Insufficient HC or OCD data for group difference analysis.")
+
 
 # Longitudinal analyses
 if valid_longitudinal:
@@ -190,7 +160,6 @@ if valid_longitudinal:
                                             ocd_df.set_index('subject_id')['delta_ybocs'], network_columns)
         regression_output = os.path.join(args.output_dir, 'baselineFC_vs_deltaYBOCS_network_fc.csv')
         regression_results.to_csv(regression_output, index=False)
-        logger.info(f"Saved baseline FC vs delta YBOCS results: {regression_output}")
 
     # 3. FC change vs symptom change
     fc_change_data = []
@@ -205,8 +174,8 @@ if valid_longitudinal:
                 change_fc[col] = follow_fc[col] - base_fc[col]
             change_fc['subject_id'] = sid
             fc_change_data.append(change_fc)
-        else:
-            logger.warning(f"Missing FC file for {sid}: baseline={base_path}, follow-up={follow_path}")
+
+
     fc_change_data = pd.concat(fc_change_data, ignore_index=True) if fc_change_data else pd.DataFrame()
 
     if not fc_change_data.empty:
@@ -214,10 +183,7 @@ if valid_longitudinal:
                                             ocd_df.set_index('subject_id')['delta_ybocs'], network_columns)
         regression_output = os.path.join(args.output_dir, 'deltaFC_vs_deltaYBOCS_network_fc.csv')
         regression_results.to_csv(regression_output, index=False)
-        logger.info(f"Saved FC change vs delta YBOCS results: {regression_output}")
 
 if not valid_group and not valid_longitudinal:
-    logger.error("No valid subjects found for any analysis.")
     raise ValueError("No valid subjects found for any analysis.")
 
-logger.info("All analyses completed.")
