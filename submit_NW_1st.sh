@@ -27,12 +27,16 @@ fi
 TEMP_JOB_DIR="/scratch/xxqian/slurm_jobs"
 mkdir -p "$TEMP_JOB_DIR"
 
+# Get the directory containing the container
+CONTAINER_DIR=$(dirname "$CONTAINER_PATH")
+CONTAINER_NAME=$(basename "$CONTAINER_PATH")
+
 # Loop over subjects and submit a job for each
 for SUBJECT in "${SUBJECTS[@]}"; do
     JOB_NAME="NW_1st_${SUBJECT}"
     JOB_SCRIPT="$TEMP_JOB_DIR/${JOB_NAME}.slurm"
 
-    # Create SLURM job script with quoted heredoc to prevent variable expansion
+    # Create SLURM job script with quoted heredoc
     cat > "$JOB_SCRIPT" << 'EOF'
 #!/bin/bash
 #SBATCH --job-name=NW_1st_${SUBJECT}
@@ -51,8 +55,8 @@ mkdir -p /scratch/xxqian/OCD/slurm_logs
 
 # Run the Apptainer container
 apptainer run \
-    --bind /project:/project,/scratch:/scratch \
-    /OCD.sif roi-to-roi --subject ${SUBJECT}
+    --bind /project:/project,/scratch:/scratch,CONTAINER_DIR:/mnt \
+    /mnt/CONTAINER_NAME roi-to-roi --subject ${SUBJECT}
 
 # Check if the job was successful
 if [ $? -eq 0 ]; then
@@ -62,8 +66,10 @@ else
 fi
 EOF
 
-    # Replace ${SUBJECT} placeholder with actual subject ID
-    sed -i "s/\${SUBJECT}/${SUBJECT}/g" "$JOB_SCRIPT"
+    # Replace placeholders with actual values
+    sed -i "s|CONTAINER_DIR|${CONTAINER_DIR}|g" "$JOB_SCRIPT"
+    sed -i "s|CONTAINER_NAME|${CONTAINER_NAME}|g" "$JOB_SCRIPT"
+    sed -i "s|\${SUBJECT}|${SUBJECT}|g" "$JOB_SCRIPT"
 
     # Submit the job
     sbatch "$JOB_SCRIPT"
