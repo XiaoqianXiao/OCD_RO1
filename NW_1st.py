@@ -88,13 +88,48 @@ if not os.path.exists(power_atlas_path):
 
 # Load network labels and coordinates
 power = fetch_coords_power_2011()
-# Check if 'network' field exists in rois recarray
-if 'network' not in power.rois.dtype.names:
-    logger.error("Power 2011 rois recarray missing 'network' field")
-    raise ValueError("Cannot generate network labels without 'network' field")
-network_labels = {i + 1: net for i, net in enumerate(power.rois['network'])}  # 1-based indexing
-coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T  # Consistent coordinate extraction
 n_rois = len(power.rois)  # 264 ROIs
+logger.info(f"Power atlas comes with {power.keys()}.")
+# Verify power.rois is a DataFrame with expected columns
+if not isinstance(power.rois, pd.DataFrame) or not all(col in power.rois.columns for col in ['roi', 'x', 'y', 'z']):
+    logger.error(f"Power.rois is not a DataFrame with columns ['roi', 'x', 'y', 'z']: {power.rois}")
+    raise ValueError("Invalid Power 2011 atlas data structure")
+if power.rois['roi'].tolist() != list(range(1, n_rois + 1)):
+    logger.error("Power.rois['roi'] does not contain 1–264 in order")
+    raise ValueError("Invalid ROI numbers in power.rois")
+network_labels_path = os.path.join(roi_dir, 'power264', 'power264NodeNames.txt')
+if not os.path.exists(network_labels_path):
+    logger.error(f"Network labels file not found: {network_labels_path}")
+    raise FileNotFoundError(f"Missing {network_labels_path}")
+try:
+    with open(network_labels_path, 'r') as f:
+        network_labels_list = [line.strip() for line in f if line.strip()]
+    if len(network_labels_list) != n_rois:
+        logger.error(f"Network labels file has {len(network_labels_list)} entries, expected {n_rois}")
+        raise ValueError(f"Invalid number of network labels in {network_labels_path}")
+    # Parse network names and ROI numbers
+    network_labels = {}
+    for i, (label, roi_num) in enumerate(zip(network_labels_list, power.rois['roi'])):
+        parts = label.rsplit('_', 1)  # Split at last underscore
+        if len(parts) != 2:
+            logger.error(f"Invalid label format in {network_labels_path} at line {i+1}: {label}")
+            raise ValueError(f"Invalid label format: {label}")
+        network_name, txt_roi_num = parts
+        try:
+            txt_roi_num = int(txt_roi_num)
+        except ValueError:
+            logger.error(f"Invalid ROI number in {network_labels_path} at line {i+1}: {txt_roi_num}")
+            raise ValueError(f"Invalid ROI number: {txt_roi_num}")
+        if txt_roi_num != roi_num:
+            logger.error(f"ROI number mismatch in {network_labels_path} at line {i+1}: {txt_roi_num} != {roi_num}")
+            raise ValueError(f"ROI number mismatch: {txt_roi_num} != {roi_num}")
+        network_labels[i + 1] = network_name  # 1-based indexing
+    logger.info(f"Loaded {len(network_labels)} network labels from {network_labels_path}")
+    logger.debug(f"Sample network labels: {list(network_labels.items())[:5]}")
+except Exception as e:
+    logger.error(f"Failed to load network labels from {network_labels_path}: {str(e)}")
+    raise
+coords = power.rois[['x', 'y', 'z']].to_numpy()  # Extract coordinates as NumPy array
 roi_names = [f"ROI_{i+1}" for i in range(n_rois)]  # Simple ROI names
 
 def validate_paths(subject, session):
