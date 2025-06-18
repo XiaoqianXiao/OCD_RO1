@@ -2,11 +2,11 @@
 #SBATCH --job-name=network_fc_group
 #SBATCH --output=/scratch/xxqian/logs/NWGroup_%A_%a.out
 #SBATCH --error=/scratch/xxqian/logs/NWGroup_%A_%a.err
-#SBATCH --time=04:00:00
+#SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=64G
+#SBATCH --mem=8G
 
 # Load Apptainer module
 module load apptainer
