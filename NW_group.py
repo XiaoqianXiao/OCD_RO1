@@ -99,7 +99,8 @@ def run_regression(fc_data, y_values, columns):
 
 
 # Validate subjects
-fc_files = glob.glob(os.path.join('/scratch/xxqian/OCD/NW_1stLevel', '*_task-rest_power2011_network_fc_avg.csv'))
+#fc_files = glob.glob(os.path.join('/scratch/xxqian/OCD/NW_1stLevel', '*_task-rest_power2011_network_fc_avg.csv'))
+fc_files = glob.glob(os.path.join('/input', '*_task-rest_power2011_network_fc_avg.csv'))
 subject_sessions = {}
 for f in fc_files:
     filename = os.path.basename(f)
