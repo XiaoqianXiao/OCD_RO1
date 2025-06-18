@@ -3,10 +3,11 @@ import glob
 import re
 import numpy as np
 import pandas as pd
-from nilearn import image, datasets
+from nilearn import image
 from nilearn.input_data import NiftiLabelsMasker
 from nilearn.image import resample_to_img
 import argparse
+from itertools import combinations
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Compute ROI-to-ROI functional connectivity using Harvard-Oxford Atlas.')
@@ -29,17 +30,22 @@ os.makedirs(work_dir, exist_ok=True)
 # Define sessions
 sessions = ['ses-baseline', 'ses-followup']
 
-# Fetch Harvard-Oxford atlas for label information
-atlas_labels = datasets.fetch_atlas_harvard_oxford('cort-maxprob-thr25-2mm')
-roi_labels = atlas_labels.labels[1:]  # Exclude background (index 0)
-n_rois = len(roi_labels)
-roi_names = [f"ROI_{label.replace(' ', '_')}" for label in roi_labels]
-
 # Load local Harvard-Oxford atlas
 harvard_oxford_atlas_path = os.path.join(roi_dir, 'HarvardOxford-cort-maxprob-thr25-2mm.nii.gz')
 if not os.path.exists(harvard_oxford_atlas_path):
     raise FileNotFoundError(f"Missing {harvard_oxford_atlas_path}")
 atlas = image.load_img(harvard_oxford_atlas_path)
+
+# Load ROI labels from local file
+label_file = os.path.join(roi_dir, 'HarvardOxford_cort_labels.txt')
+if not os.path.exists(label_file):
+    raise FileNotFoundError(f"Missing {label_file}")
+with open(label_file, 'r') as f:
+    roi_labels = [line.strip() for line in f if line.strip()]
+if len(roi_labels) != 48:
+    raise ValueError(f"Expected 48 ROI labels in {label_file}, got {len(roi_labels)}")
+roi_names = [f"ROI_{label.replace(' ', '_').replace(',', '')}" for label in roi_labels]
+n_rois = len(roi_labels)
 
 def validate_paths(subject, session):
     """Validate and return paths for fMRI and brain mask."""
