@@ -1,18 +1,20 @@
 #!/bin/bash
 
 # SLURM job submission script for running roi-to-roi for each subject
+CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
 
 # Define directories
 BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
 OUTPUT_DIR="/scratch/xxqian/OCD"
-CONTAINER_PATH="/scratch/xxqian/repo/image/OCD.sif"
+LOG_DIR="/scratch/xxqian/logs"
+TEMP_JOB_DIR="/scratch/xxqian/slurm_jobs"
 
-# Create output directory if it doesn't exist
-mkdir -p "$OUTPUT_DIR"
+# Create necessary directories
+mkdir -p "$OUTPUT_DIR" "$LOG_DIR" "$TEMP_JOB_DIR"
 
 # Check if container exists
-if [ ! -f "$CONTAINER_PATH" ]; then
-    echo "Error: Apptainer container $CONTAINER_PATH not found"
+if [ ! -f "$CONTAINER" ]; then
+    echo "Error: Apptainer container $CONTAINER not found"
     exit 1
 fi
 
@@ -23,12 +25,16 @@ if [ ${#SUBJECTS[@]} -eq 0 ]; then
     exit 1
 fi
 
-# Create a temporary directory for SLURM job scripts
-TEMP_JOB_DIR="/scratch/xxqian/slurm_jobs"
-mkdir -p "$TEMP_JOB_DIR"
+# Define bind paths for Apptainer, avoiding redundant mounts
+APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian:/scratch/xxqian"
 
-# Define bind paths for Apptainer
-APPTAINER_BIND="/project:/project,/scratch:/scratch"
+# Verify bind paths
+for path in "/project/6079231/dliang55/R01_AOCD" "/scratch/xxqian"; do
+    if [ ! -e "$path" ]; then
+        echo "Error: Bind path does not exist: $path"
+        exit 1
+    fi
+done
 
 # Loop over subjects and submit a job for each
 for SUBJECT in "${SUBJECTS[@]}"; do
@@ -38,12 +44,12 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     # Extract subject ID without 'sub-' prefix
     SUBJECT_ID=${SUBJECT#sub-}
 
-    # Create SLURM job script with quoted heredoc
-    cat > "$JOB_SCRIPT" << 'EOF'
+    # Create SLURM job script
+    cat > "$JOB_SCRIPT" << EOF
 #!/bin/bash
-#SBATCH --job-name=NW_1st_SUBJECT
-#SBATCH --output=/scratch/xxqian/logs/NW_1st_%x_%j.out
-#SBATCH --error=/scratch/xxqian/logs/NW_1st_%x_%j.err
+#SBATCH --job-name=${JOB_NAME}
+#SBATCH --output=${LOG_DIR}/${JOB_NAME}_%j.out
+#SBATCH --error=${LOG_DIR}/${JOB_NAME}_%j.err
 #SBATCH --mem=8G
 #SBATCH --time=01:00:00
 #SBATCH --cpus-per-task=1
@@ -52,30 +58,24 @@ for SUBJECT in "${SUBJECTS[@]}"; do
 # Load Apptainer module
 module load apptainer
 
-
 # Define variables
-SUBJECT=SUBJECT_ID
+SUBJECT=${SUBJECT_ID}
 
 # Run the Apptainer container for one subject
-if [ -n "$SUBJECT" ]; then
-  apptainer exec --bind "${APPTAINER_BIND}" "${CONTAINER_PATH}" python3 /app/NW_1st.py --subject sub-${SUBJECT}
+if [ -n "\$SUBJECT" ]; then
+    apptainer exec --bind "${APPTAINER_BIND}" "${CONTAINER}" python3 /app/NW_1st.py --subject sub-\${SUBJECT}
 else
-  echo "Error: No subject found" >&2
-  exit 1
+    echo "Error: No subject found" >&2
+    exit 1
 fi
 
 # Check if the job was successful
-if [ $? -eq 0 ]; then
-    echo "Job for sub-${SUBJECT} completed successfully" >> /scratch/xxqian/logs/sub-${SUBJECT}_status.log
+if [ \$? -eq 0 ]; then
+    echo "Job for sub-\${SUBJECT} completed successfully" >> ${LOG_DIR}/sub-\${SUBJECT}_status.log
 else
-    echo "Job for sub-${SUBJECT} failed" >> /scratch/xxqian/logs/sub-${SUBJECT}_status.log
+    echo "Job for sub-\${SUBJECT} failed" >> ${LOG_DIR}/sub-\${SUBJECT}_status.log
 fi
 EOF
-
-    # Replace placeholders with actual values
-    sed -i "s|SUBJECT_ID|${SUBJECT_ID}|g" "$JOB_SCRIPT"
-    sed -i "s|APPTAINER_BINDPATH|${APPTAINER_BIND}|g" "$JOB_SCRIPT"
-    sed -i "s|NW_1st_SUBJECT|${JOB_NAME}|g" "$JOB_SCRIPT"
 
     # Submit the job
     sbatch "$JOB_SCRIPT"
