@@ -64,8 +64,20 @@ def run_ttest(fc_data_hc, fc_data_ocd, columns):
 def run_regression(fc_data, y_values, columns):
     """Run linear regression with FDR correction."""
     results = []
+    # Ensure indices are strings for consistency
+    fc_data.index = fc_data.index.astype(str)
+    y_values.index = y_values.index.astype(str)
+    # Find common subjects
+    common_subjects = fc_data.index.intersection(y_values.index)
+    if not common_subjects.size:
+        return pd.DataFrame()
+    fc_data = fc_data.loc[common_subjects]
+    y_values = y_values.loc[common_subjects]
+
     for col in columns:
         x = fc_data[col].dropna()
+        if x.empty:
+            continue
         y = y_values.loc[x.index].dropna()
         if len(x) < 2 or len(y) < 2:
             continue
@@ -138,7 +150,8 @@ def load_roi_fc_data(subject_ids, session, input_dir, fc_types=['within_network_
     fc_data = []
     feature_columns = None
     for sid in subject_ids:
-        fc_path = get_roi_fc_path(sid, session, input_dir)
+        sid_no_prefix = sid.replace('sub-', '')  # Normalize subject ID
+        fc_path = get_roi_fc_path(sid_no_prefix, session, input_dir)
         if not os.path.exists(fc_path):
             continue
         try:
@@ -159,9 +172,9 @@ def load_roi_fc_data(subject_ids, session, input_dir, fc_types=['within_network_
                 ).reset_index(drop=True)
                 temp.columns = [f"{col}_{ftype}" for col in temp.columns]
                 fc_pivot = pd.concat([fc_pivot, temp], axis=1)
-            fc_pivot['subject_id'] = sid
+            fc_pivot['subject_id'] = sid_no_prefix
             fc_data.append(fc_pivot)
-        except Exception as e:
+        except Exception:
             continue
     return pd.concat(fc_data, ignore_index=True) if fc_data else pd.DataFrame(), feature_columns
 
@@ -170,6 +183,10 @@ def load_roi_fc_data(subject_ids, session, input_dir, fc_types=['within_network_
 def main():
     # Load metadata
     df, df_clinical = load_and_validate_metadata(args.subjects_csv, args.clinical_csv)
+
+    # Normalize subject IDs in metadata
+    df['subject_id'] = df['subject_id'].str.replace('sub-', '')
+    df_clinical['subject_id'] = df_clinical['subject_id'].str.replace('sub-', '')
 
     # Validate subjects
     valid_group, valid_longitudinal, _ = validate_subjects(args.input_dir, df)
@@ -211,6 +228,7 @@ def main():
         # FC change vs symptom change
         fc_change_data = []
         for sid in valid_longitudinal:
+            sid = sid.replace('sub-', '')  # Normalize subject ID
             base_path = get_roi_fc_path(sid, 'ses-baseline', args.input_dir)
             follow_path = get_roi_fc_path(sid, 'ses-followup', args.input_dir)
             if not (os.path.exists(base_path) and os.path.exists(follow_path)):
@@ -220,7 +238,7 @@ def main():
                 follow_fc = pd.read_csv(follow_path)
                 base_fc['feature_id'] = base_fc['network_name'] + '_' + base_fc['roi_name']
                 follow_fc['feature_id'] = follow_fc['network_name'] + '_' + follow_fc['roi_name']
-                change_fc = follow_fc.copy()
+                change_fc = pd.DataFrame()
                 for ftype in ['within_network_FC', 'between_network_FC']:
                     base_pivot = base_fc.pivot_table(index=None, columns='feature_id', values=ftype).reset_index(
                         drop=True)
@@ -236,6 +254,7 @@ def main():
 
         if fc_change_data:
             fc_change_data = pd.concat(fc_change_data, ignore_index=True)
+            fc_change_data['subject_id'] = fc_change_data['subject_id'].astype(str)
             regression_results = run_regression(
                 fc_change_data.set_index('subject_id'),
                 ocd_df.set_index('subject_id')['delta_ybocs'],
