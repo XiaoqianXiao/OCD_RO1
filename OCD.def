@@ -14,6 +14,8 @@ From: narsad-fmri_1st_level_1.0.sif
     NW_group.py /app/NW_group.py
 
 %post
+    update apt-get install -y python3-pip pip3 install --upgrade pip
+    pip3 install statsmodels nilearn scipy pandas numpy
     chmod +x /app/STV_1st.py
     chmod +x /app/STV_group.py
     chmod +x /app/NW_1st.py
