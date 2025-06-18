@@ -40,7 +40,7 @@ done
 mkdir -p "${OUTPUT_DIR}"
 
 # Run the Python script inside the Apptainer container
-apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_group.py \
+apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_group2.py \
     --subjects_csv /subjects.csv \
     --clinical_csv /clinical.csv \
     --output_dir /output
