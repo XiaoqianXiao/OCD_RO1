@@ -69,12 +69,6 @@ else
     exit 1
 fi
 
-# Check if the job was successful
-if [ \$? -eq 0 ]; then
-    echo "Job for sub-\${SUBJECT} completed successfully" >> ${LOG_DIR}/sub-\${SUBJECT}_status.log
-else
-    echo "Job for sub-\${SUBJECT} failed" >> ${LOG_DIR}/sub-\${SUBJECT}_status.log
-fi
 EOF
 
     # Submit the job
