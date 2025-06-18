@@ -55,11 +55,10 @@ module load apptainer
 
 # Define variables
 SUBJECT=SUBJECT_ID
-APPTAINER_BIND=APPTAINER_BINDPATH
 
 # Run the Apptainer container for one subject
 if [ -n "$SUBJECT" ]; then
-  apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER_PATH} python3 /app/NW_1st.py --subject sub-${SUBJECT}
+  apptainer exec --bind "${APPTAINER_BIND}" "${CONTAINER_PATH}" python3 /app/NW_1st.py --subject sub-${SUBJECT}
 else
   echo "Error: No subject found" >&2
   exit 1
