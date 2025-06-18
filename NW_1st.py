@@ -49,11 +49,13 @@ power_atlas_path = os.path.join(roi_dir, 'power_2011_atlas.nii.gz')
 if not os.path.exists(power_atlas_path):
     logger.info("Generating Power 2011 atlas from coordinates")
     power = fetch_coords_power_2011()
-    # Extract x, y, z coordinates as a NumPy array
-    if not all(col in power.rois.columns for col in ['x', 'y', 'z']):
-        logger.error("Power 2011 rois DataFrame missing required columns: x, y, z")
+    # Verify recarray fields
+    required_fields = ['x', 'y', 'z']
+    if not all(field in power.rois.dtype.names for field in required_fields):
+        logger.error(f"Power 2011 rois recarray missing required fields: {required_fields}")
         raise ValueError("Invalid Power 2011 atlas data structure")
-    coords = power.rois[['x', 'y', 'z']].to_numpy()
+    # Extract x, y, z coordinates as a NumPy array
+    coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T
     logger.info(f"Power 2011 coordinates shape: {coords.shape} (expected: (264, 3))")
     logger.info(f"Sample coordinates: {coords[:5].tolist()}")
     template = load_mni152_template(resolution=2)
@@ -87,7 +89,7 @@ if not os.path.exists(power_atlas_path):
 # Load network labels and coordinates
 power = fetch_coords_power_2011()
 network_labels = {i + 1: net for i, net in enumerate(power.networks)}  # 1-based indexing
-coords = power.rois[['x', 'y', 'z']].to_numpy()  # Consistent coordinate extraction
+coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T  # Consistent coordinate extraction
 n_rois = len(power.rois)  # 264 ROIs
 roi_names = [f"ROI_{i+1}" for i in range(n_rois)]  # Simple ROI names
 
