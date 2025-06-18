@@ -17,7 +17,7 @@ if [ ! -f "$CONTAINER_PATH" ]; then
 fi
 
 # Get list of subjects from BIDS derivatives directory
-SUBJECTS=($(ls -d $BIDS_DIR/sub-* | xargs -n 1 basename | grep '^sub-'))
+SUBJECTS=($(ls -d "$BIDS_DIR"/sub-* | xargs -n 1 basename | grep '^sub-'))
 if [ ${#SUBJECTS[@]} -eq 0 ]; then
     echo "Error: No subjects found in $BIDS_DIR"
     exit 1
@@ -32,10 +32,10 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     JOB_NAME="NW_1st_${SUBJECT}"
     JOB_SCRIPT="$TEMP_JOB_DIR/${JOB_NAME}.slurm"
 
-    # Create SLURM job script
-    cat > "$JOB_SCRIPT" << EOF
+    # Create SLURM job script with quoted heredoc to prevent variable expansion
+    cat > "$JOB_SCRIPT" << 'EOF'
 #!/bin/bash
-#SBATCH --job-name=$JOB_NAME
+#SBATCH --job-name=NW_1st_${SUBJECT}
 #SBATCH --output=/scratch/xxqian/logs/NW_1st_%x_%j.out
 #SBATCH --error=/scratch/xxqian/logs/NW_1st_%x_%j.err
 #SBATCH --mem=8G
@@ -43,24 +43,27 @@ for SUBJECT in "${SUBJECTS[@]}"; do
 #SBATCH --cpus-per-task=1
 #SBATCH --account=def-jfeusner
 
-# Load Apptainer module (adjust module name if needed)
+# Load Apptainer module
 module load apptainer
 
 # Create output log directory
-mkdir -p $OUTPUT_DIR/slurm_logs
+mkdir -p /scratch/xxqian/OCD/slurm_logs
 
 # Run the Apptainer container
-apptainer run \\
-    --bind /project:/project,/scratch:/scratch \\
-    $CONTAINER_PATH roi-to-roi --subject $SUBJECT
+apptainer run \
+    --bind /project:/project,/scratch:/scratch \
+    /OCD.sif roi-to-roi --subject ${SUBJECT}
 
 # Check if the job was successful
-if [ \$? -eq 0 ]; then
-    echo "Job for $SUBJECT completed successfully" >> $OUTPUT_DIR/slurm_logs/${SUBJECT}_status.log
+if [ $? -eq 0 ]; then
+    echo "Job for ${SUBJECT} completed successfully" >> /scratch/xxqian/OCD/slurm_logs/${SUBJECT}_status.log
 else
-    echo "Job for $SUBJECT failed" >> $OUTPUT_DIR/slurm_logs/${SUBJECT}_status.log
+    echo "Job for ${SUBJECT} failed" >> /scratch/xxqian/OCD/slurm_logs/${SUBJECT}_status.log
 fi
 EOF
+
+    # Replace ${SUBJECT} placeholder with actual subject ID
+    sed -i "s/\${SUBJECT}/${SUBJECT}/g" "$JOB_SCRIPT"
 
     # Submit the job
     sbatch "$JOB_SCRIPT"
