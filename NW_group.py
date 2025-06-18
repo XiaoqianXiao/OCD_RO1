@@ -10,7 +10,7 @@ import logging
 # Set up logging
 #log_file = '/Users/xiaoqianxiao/projects/OCD/logs/NW_group.log'
 log_file = '/scratch/xxqian/OCD/logs/NW_group.log'
-os.makedirs(os.path.dirname(log_file), exist_ok=True)
+#os.makedirs(os.path.dirname(log_file), exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',

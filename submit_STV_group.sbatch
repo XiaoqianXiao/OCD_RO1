@@ -26,7 +26,7 @@ CLINICAL_CSV="${SCRATCH_DIR}/OCD/behav/clinical.csv"
 
 
 # Bind directories
-APPTAINER_BIND="/scratch/xxqian/work_flow:/scratch, /scratch/xxqian/OCD:/output, /scratch/xxqian/roi:/scratch/xxqian/roi, ${CLINICAL_CSV}:/clinical.csv, ${SUBJECTS_CSV}:/subjects.csv"
+APPTAINER_BIND="/scratch/xxqian/repo/OCD_RO1/NW_group.py:/app/NW_group.py, /scratch/xxqian/work_flow:/scratch, /scratch/xxqian/OCD:/output, /scratch/xxqian/roi:/scratch/xxqian/roi, ${CLINICAL_CSV}:/clinical.csv, ${SUBJECTS_CSV}:/subjects.csv"
 
 # Verify bind paths
 for path in "${SCRATCH_DIR}/work_flow" "${SCRATCH_DIR}/OCD" "${SCRATCH_DIR}/roi" "${CLINICAL_CSV}" "${SUBJECTS_CSV}"; do
