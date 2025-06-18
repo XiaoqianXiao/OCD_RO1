@@ -5,7 +5,7 @@
 # Define directories
 BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
 OUTPUT_DIR="/scratch/xxqian/OCD"
-CONTAINER_PATH="/scratch/xxqian/OCD.sif"
+CONTAINER_PATH="/scratch/xxqian/repo/image/OCD.sif"
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
@@ -52,17 +52,14 @@ for SUBJECT in "${SUBJECTS[@]}"; do
 # Load Apptainer module
 module load apptainer
 
-# Create output log directory
-mkdir -p /scratch/xxqian/OCD/slurm_logs
 
 # Define variables
 SUBJECT=SUBJECT_ID
 APPTAINER_BIND=APPTAINER_BINDPATH
-CONTAINER=/scratch/xxqian/OCD.sif
 
 # Run the Apptainer container for one subject
 if [ -n "$SUBJECT" ]; then
-  apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER} roi-to-roi --subject sub-${SUBJECT}
+  apptainer exec --bind ${APPTAINER_BIND} ${CONTAINER_PATH} python3 /app/NW_1st.py --subject sub-${SUBJECT}
 else
   echo "Error: No subject found" >&2
   exit 1
@@ -70,9 +67,9 @@ fi
 
 # Check if the job was successful
 if [ $? -eq 0 ]; then
-    echo "Job for sub-${SUBJECT} completed successfully" >> /scratch/xxqian/OCD/slurm_logs/sub-${SUBJECT}_status.log
+    echo "Job for sub-${SUBJECT} completed successfully" >> /scratch/xxqian/logs/sub-${SUBJECT}_status.log
 else
-    echo "Job for sub-${SUBJECT} failed" >> /scratch/xxqian/OCD/slurm_logs/sub-${SUBJECT}_status.log
+    echo "Job for sub-${SUBJECT} failed" >> /scratch/xxqian/logs/sub-${SUBJECT}_status.log
 fi
 EOF
 
@@ -87,4 +84,3 @@ EOF
 done
 
 echo "All jobs submitted. Check status with 'squeue -u $USER'"
-echo "Logs will be in $OUTPUT_DIR/slurm_logs/"
