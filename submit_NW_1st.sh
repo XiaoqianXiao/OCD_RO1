@@ -5,7 +5,7 @@
 # Define directories
 BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
 OUTPUT_DIR="/scratch/xxqian/OCD"
-CONTAINER_PATH="$(pwd)/run_roi_to_roi.sif"
+CONTAINER_PATH="$(pwd)/OCD.sif"
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
