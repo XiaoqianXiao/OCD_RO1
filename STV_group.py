@@ -1,7 +1,8 @@
 import os
 import numpy as np
 import pandas as pd
-from nilearn import image, masking
+from nilearn import image
+from nilearn.input_data import NiftiMasker
 from nipype.interfaces.fsl import Randomise
 import argparse
 import glob
@@ -57,7 +58,7 @@ def run_voxelwise_regression(input_imgs, y_values, prefix):
         print(f"Error during nilearn merge for {prefix}: {e}")
         raise
 
-    masker = masking.NiftiMasker(mask_img=group_mask_file, memory=args.work_dir)
+    masker =NiftiMasker(mask_img=group_mask_file, memory=args.work_dir)
     masked = masker.fit_transform(image.load_img(merged))
     masked_img = masker.inverse_transform(masked)
     masked_path = os.path.join(args.output_dir, f'{prefix}_masked.nii.gz')
