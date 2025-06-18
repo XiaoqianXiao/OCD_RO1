@@ -14,12 +14,17 @@ From: narsad-fmri_1st_level_1.0.sif
     NW_group.py /app/NW_group.py
 
 %post
-    update apt-get install -y python3-pip pip3 install --upgrade pip
+    apt-get update
+    apt-get install -y python3-pip
+    pip3 install --upgrade pip
     pip3 install statsmodels nilearn scipy pandas numpy
     chmod +x /app/STV_1st.py
     chmod +x /app/STV_group.py
     chmod +x /app/NW_1st.py
     chmod +x /app/NW_group.py
+    # Clean up apt cache to reduce container size
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
 
 %runscript
     if the first argument is "roi-to-roi":
