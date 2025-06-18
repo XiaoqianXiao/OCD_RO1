@@ -12,7 +12,7 @@
 module load apptainer
 
 # Path to Apptainer container
-CONTAINER="/scratch/xxqian/repo/image/STV_1st_and_group_level.sif"
+CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
 
 # Set environment variables
 export FSLOUTPUTTYPE=NIFTI_GZ
@@ -21,7 +21,6 @@ export OMP_NUM_THREADS=8
 PROJECT_DIR="/project/6079231/dliang55/R01_AOCD"
 SCRATCH_DIR="/scratch/xxqian"
 OUTPUT_DIR="${SCRATCH_DIR}/OCD"
-CONTAINER="${SCRATCH_DIR}/repo/image/STV_1st_and_group_level.sif"
 SUBJECTS_CSV="${PROJECT_DIR}/metadata/shared_demographics.csv"
 CLINICAL_CSV="${SCRATCH_DIR}/OCD/behav/clinical.csv"
 
