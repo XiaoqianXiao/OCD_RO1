@@ -88,7 +88,11 @@ if not os.path.exists(power_atlas_path):
 
 # Load network labels and coordinates
 power = fetch_coords_power_2011()
-network_labels = {i + 1: net for i, net in enumerate(power.networks)}  # 1-based indexing
+# Check if 'network' field exists in rois recarray
+if 'network' not in power.rois.dtype.names:
+    logger.error("Power 2011 rois recarray missing 'network' field")
+    raise ValueError("Cannot generate network labels without 'network' field")
+network_labels = {i + 1: net for i, net in enumerate(power.rois['network'])}  # 1-based indexing
 coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T  # Consistent coordinate extraction
 n_rois = len(power.rois)  # 264 ROIs
 roi_names = [f"ROI_{i+1}" for i in range(n_rois)]  # Simple ROI names
