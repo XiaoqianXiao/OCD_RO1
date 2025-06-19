@@ -26,7 +26,7 @@ CLINICAL_CSV="${SCRATCH_DIR}/OCD/behav/clinical.csv"
 INPUT_DIR="${SCRATCH_DIR}/OCD/NW_1stLevel"
 
 # Bind directories
-APPTAINER_BIND="/scratch/xxqian/repo/OCD_RO1/NW_group2.py:/app/NW_group2.py, ${SCRATCH_DIR}/OCD:/output,${PROJECT_DIR}/metadata:/metadata,${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv,${INPUT_DIR}:/input"
+APPTAINER_BIND="/scratch/xxqian/repo/OCD_RO1/NW_group.py:/app/NW_group.py, ${SCRATCH_DIR}/OCD:/output,${PROJECT_DIR}/metadata:/metadata,${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv,${INPUT_DIR}:/input"
 
 # Verify bind paths
 for path in "${SCRATCH_DIR}/OCD" "${PROJECT_DIR}/metadata" "${CLINICAL_CSV}" "${SUBJECTS_CSV}" "${INPUT_DIR}"; do
@@ -40,7 +40,7 @@ done
 mkdir -p "${OUTPUT_DIR}"
 
 # Run the Python script inside the Apptainer container
-apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_group2.py \
+apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_group.py \
     --subjects_csv /subjects.csv \
     --clinical_csv /clinical.csv \
     --output_dir /output
