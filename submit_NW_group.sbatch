@@ -43,5 +43,5 @@ mkdir -p "${OUTPUT_DIR}"
 apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_group.py \
     --subjects_csv /subjects.csv \
     --clinical_csv /clinical.csv \
-    --output_dir /output
+    --output_dir /output \
     --input_dir /input
