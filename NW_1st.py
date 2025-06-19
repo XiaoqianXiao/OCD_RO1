@@ -267,6 +267,39 @@ def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
                 network_fc[net_i]['between'][net_j].append(corr)
                 network_fc[net_j]['between'][net_i].append(corr)
 
+        # Save network-level pairwise FC in required format
+        pairwise_network_fc = []
+        for net1, net2 in combinations(unique_networks, 2):
+            corrs = network_fc[net1]['between'][net2]
+            if corrs:
+                mean_fc = np.mean(corrs)
+                pairwise_network_fc.append({
+                    'ROI': f"{net1}_{net2}",
+                    'network1': net1,
+                    'network2': net2,
+                    'fc_value': mean_fc
+                })
+        for net in unique_networks:
+            corrs = network_fc[net]['within']
+            if corrs:
+                mean_fc = np.mean(corrs)
+                pairwise_network_fc.append({
+                    'ROI': f"{net}_{net}",
+                    'network1': net,
+                    'network2': net,
+                    'fc_value': mean_fc
+                })
+
+        # Save pairwise network FC
+        output_pairwise_csv = f"{output_prefix}_network_fc_avg.csv"
+        pairwise_df = pd.DataFrame(pairwise_network_fc)
+        if not pairwise_df.empty:
+            pairwise_df.to_csv(output_pairwise_csv, index=False)
+            logger.info(f"Saved pairwise network FC: {output_pairwise_csv} with {len(pairwise_df)} entries")
+        else:
+            logger.warning(f"No pairwise network FC data to save for {output_pairwise_csv}")
+
+        # Save existing network summary
         network_summary = []
         for net in unique_networks:
             within_mean = np.mean(network_fc[net]['within']) if network_fc[net]['within'] else np.nan
@@ -276,11 +309,11 @@ def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
                 row[f'Between_{other_net}_FC'] = between_mean
             network_summary.append(row)
 
-        output_network_csv = f"{output_prefix}_network_fc.csv"
+        output_network_csv = f"{output_prefix}_network_summary.csv"
         pd.DataFrame(network_summary).to_csv(output_network_csv, index=False)
         logger.info(f"Saved network FC summary: {output_network_csv}")
 
-        return output_matrix, output_roi_csv, output_network_csv
+        return output_matrix, output_roi_csv, output_pairwise_csv, output_network_csv
     except Exception as e:
         logger.error(f"Failed to process run {fmri_file}: {str(e)}")
         return None
@@ -320,7 +353,7 @@ def main():
                     if result:
                         results.append(result)
                     if results:
-                        src_matrix, src_roi_csv, src_network_csv = results[0]
+                        src_matrix, src_roi_csv, src_pairwise_csv, src_network_csv = results[0]
                         avg_matrix_output = os.path.join(
                             output_dir,
                             f'{subject}_{session}_task-rest_power2011_roiroi_matrix_avg.npy'
@@ -333,12 +366,18 @@ def main():
                         )
                         os.rename(src_roi_csv, avg_roi_csv)
                         logger.info(f"Moved single ROI-level FC to: {avg_roi_csv}")
-                        avg_network_csv = os.path.join(
+                        avg_pairwise_csv = os.path.join(
                             output_dir,
                             f'{subject}_{session}_task-rest_power2011_network_fc_avg.csv'
                         )
+                        os.rename(src_pairwise_csv, avg_pairwise_csv)
+                        logger.info(f"Moved single pairwise network FC to: {avg_pairwise_csv}")
+                        avg_network_csv = os.path.join(
+                            output_dir,
+                            f'{subject}_{session}_task-rest_power2011_network_summary_avg.csv'
+                        )
                         os.rename(src_network_csv, avg_network_csv)
-                        logger.info(f"Moved single network FC to: {avg_network_csv}")
+                        logger.info(f"Moved single network summary to: {avg_network_csv}")
                 except Exception as e:
                     logger.error(f"Failed to process {subject} {session}: {str(e)}")
                     continue
