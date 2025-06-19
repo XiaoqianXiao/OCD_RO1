@@ -26,7 +26,7 @@ parser = argparse.ArgumentParser(description='ROI-to-network FC group analysis')
 parser.add_argument('--subjects_csv', type=str, required=True, help='Path to group.csv')
 parser.add_argument('--clinical_csv', type=str, required=True, help='Path to clinical.csv')
 parser.add_argument('--output_dir', type=str, default='/scratch/xxqian/OCD/NW_group', help='Output directory')
-parser.add_argument('--input_dir', type=str, default='/scratch/xxqian/OCD', help='Input directory for FC data')
+parser.add_argument('--input_dir', type=str, default='/scratch/xxqian/OCD/NW_1stLevel', help='Input directory for FC data')
 args = parser.parse_args()
 
 # Create output directory and set up logging
