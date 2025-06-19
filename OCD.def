@@ -12,6 +12,7 @@ From: OCD.0.sif
     STV_group.py /app/STV_group.py
     NW_1st.py /app/NW_1st.py
     ROI_1st.py /app/ROI_1st.py
+    PCC_ROI_1st.py /app/PCC_ROI_1st.py
     NW_group.py /app/NW_group.py
     NW_group2.py /app/NW_group2.py
     ROI_group.py /app/ROI_group.py
@@ -24,12 +25,15 @@ From: OCD.0.sif
     chmod +x /app/NW_group2.py
     chmod +x /app/ROI_1st.py
     chmod +x /app/ROI_group.py
+    chmod +x /app/PCC_ROI_1st.py
 
 %runscript
     if the first argument is "roi-to-roi":
     run: python3 /app/NW_1st.py with all arguments after the first one
 else if the first argument is "first-level":
     run: python3 /app/STV_1st.py with all arguments after the first one
+else if the first argument is "first-level-pcc-ROI":
+    run: python3 /app/PCC_ROI_1st.py with all arguments after the first one
 else if the first argument is "first-level-roi":
     run: python3 /app/ROI_1st.py with all arguments after the first one
 else if the first argument is "group-level-STV":
