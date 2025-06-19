@@ -54,21 +54,23 @@ def get_group(subject_id, metadata_df):
     logging.debug("Found group %s for subject %s", group.iloc[0], subject_id)
     return group.iloc[0]
 
-def run_ttest(fc_data_hc, fc_data_ocd, columns):
+def run_ttest(fc_data_hc, fc_data_ocd, feature_info):
     """Run two-sample t-tests with FDR correction."""
-    logging.info("Running t-tests for %d features", len(columns))
+    logging.info("Running t-tests for %d features", len(feature_info))
     results = []
-    for col in columns:
-        hc_values = fc_data_hc[col].dropna()
-        ocd_values = fc_data_ocd[col].dropna()
-        logging.debug("Feature %s: HC n=%d, OCD n=%d", col, len(hc_values), len(ocd_values))
+    for feature, (net1, net2) in feature_info.items():
+        hc_values = fc_data_hc[feature].dropna()
+        ocd_values = fc_data_ocd[feature].dropna()
+        logging.debug("Feature %s (%s_%s): HC n=%d, OCD n=%d", feature, net1, net2, len(hc_values), len(ocd_values))
         if len(hc_values) < 2 or len(ocd_values) < 2:
-            logging.warning("Skipping feature %s due to insufficient data (HC n=%d, OCD n=%d)",
-                           col, len(hc_values), len(ocd_values))
+            logging.warning("Skipping feature %s (%s_%s) due to insufficient data (HC n=%d, OCD n=%d)",
+                           feature, net1, net2, len(hc_values), len(ocd_values))
             continue
         t_stat, p_val = stats.ttest_ind(ocd_values, hc_values, equal_var=False)
         results.append({
-            'Feature': col,
+            'network1': net1,
+            'network2': net2,
+            'Feature': feature,
             't_statistic': t_stat,
             'p_value': p_val,
             'OCD_mean': np.mean(ocd_values),
@@ -86,9 +88,9 @@ def run_ttest(fc_data_hc, fc_data_ocd, columns):
     logging.info("Generated t-test results for %d features", len(results_df))
     return results_df
 
-def run_regression(fc_data, y_values, columns):
+def run_regression(fc_data, y_values, feature_info):
     """Run linear regression with FDR correction."""
-    logging.info("Running regressions for %d features", len(columns))
+    logging.info("Running regressions for %d features", len(feature_info))
     results = []
     fc_data.index = fc_data.index.astype(str)
     y_values.index = y_values.index.astype(str)
@@ -100,21 +102,23 @@ def run_regression(fc_data, y_values, columns):
     fc_data = fc_data.loc[common_subjects]
     y_values = y_values.loc[common_subjects]
 
-    for col in columns:
-        x = fc_data[col].dropna()
+    for feature, (net1, net2) in feature_info.items():
+        x = fc_data[feature].dropna()
         if x.empty:
-            logging.warning("Skipping feature %s due to empty data", col)
+            logging.warning("Skipping feature %s (%s_%s) due to empty data", feature, net1, net2)
             continue
         y = y_values.loc[x.index].dropna()
-        logging.debug("Feature %s: n=%d", col, len(x))
+        logging.debug("Feature %s (%s_%s): n=%d", feature, net1, net2, len(x))
         if len(x) < 2 or len(y) < 2:
-            logging.warning("Skipping feature %s due to insufficient data (n=%d)", col, len(x))
+            logging.warning("Skipping feature %s (%s_%s) due to insufficient data (n=%d)", feature, net1, net2, len(x))
             continue
         x = x.values.reshape(-1, 1)
         y = y.values
         slope, intercept, r_value, p_val, _ = stats.linregress(x.flatten(), y)
         results.append({
-            'Feature': col,
+            'network1': net1,
+            'network2': net2,
+            'Feature': feature,
             'slope': slope,
             'intercept': intercept,
             'r_value': r_value,
@@ -205,7 +209,7 @@ def load_network_fc_data(subject_ids, session, input_dir):
     """Load network-level FC data for given subjects and session."""
     logging.info("Loading network FC data for %d subjects, session %s", len(subject_ids), session)
     fc_data = []
-    feature_columns = None
+    feature_info = None
     valid_subjects = 0
     for sid in subject_ids:
         sid_no_prefix = sid.replace('sub-', '')
@@ -218,11 +222,12 @@ def load_network_fc_data(subject_ids, session, input_dir):
         try:
             fc_df = pd.read_csv(fc_path)
             logging.debug("Loaded network FC file %s with %d rows", fc_path, len(fc_df))
-            # Create unique feature identifier (sorted to avoid duplicates like A_B vs B_A)
+            # Create feature identifier and map networks
             fc_df['feature_id'] = fc_df['ROI']
-            if feature_columns is None:
-                feature_columns = fc_df['feature_id'].unique().tolist()
-                logging.debug("Identified %d feature columns", len(feature_columns))
+            if feature_info is None:
+                feature_info = {row['ROI']: (row['network1'], row['network2'])
+                               for _, row in fc_df[['ROI', 'network1', 'network2']].drop_duplicates().iterrows()}
+                logging.debug("Identified %d feature columns with network mappings", len(feature_info))
             # Pivot to make features as columns
             fc_pivot = fc_df.pivot_table(
                 index=None,
@@ -237,10 +242,10 @@ def load_network_fc_data(subject_ids, session, input_dir):
             continue
     if not fc_data:
         logging.warning("No valid network FC data loaded for session %s", session)
-        return pd.DataFrame(), feature_columns
+        return pd.DataFrame(), feature_info
     fc_data_df = pd.concat(fc_data, ignore_index=True)
-    logging.info("Loaded network FC data for %d subjects, %d features", valid_subjects, len(feature_columns))
-    return fc_data_df, feature_columns
+    logging.info("Loaded network FC data for %d subjects, %d features", valid_subjects, len(feature_info))
+    return fc_data_df, feature_info
 
 # Main Analysis
 def main():
@@ -260,7 +265,7 @@ def main():
         raise ValueError("No valid subjects found for any analysis.")
 
     # Load baseline network FC data
-    baseline_fc_data, feature_columns = load_network_fc_data(valid_group, 'ses-baseline', args.input_dir)
+    baseline_fc_data, feature_info = load_network_fc_data(valid_group, 'ses-baseline', args.input_dir)
     if baseline_fc_data.empty:
         logging.warning("No baseline network FC data loaded. Skipping group and longitudinal analyses.")
         return
@@ -271,11 +276,11 @@ def main():
         ocd_data = baseline_fc_data[baseline_fc_data['subject_id'].isin(df[df['group'] == 'OCD']['subject_id'])]
         logging.info("Group analysis: HC n=%d, OCD n=%d", len(hc_data), len(ocd_data))
         if not hc_data.empty and not ocd_data.empty:
-            ttest_results = run_ttest(hc_data, ocd_data, feature_columns)
+            ttest_results = run_ttest(hc_data, ocd_data, feature_info)
             if not ttest_results.empty:
                 output_path = os.path.join(args.output_dir, 'group_diff_baseline_network_fc.csv')
                 ttest_results.to_csv(output_path, index=False)
-                logging.info("Saved t-test results to %s", output_path)
+                logging.info("Saved t-test results to %s with columns: %s", output_path, list(ttest_results.columns))
             else:
                 logging.info("No significant t-test results to save")
         else:
@@ -295,12 +300,13 @@ def main():
             regression_results = run_regression(
                 baseline_fc_ocd.set_index('subject_id'),
                 ocd_df.set_index('subject_id')['delta_ybocs'],
-                feature_columns
+                feature_info
             )
             if not regression_results.empty:
                 output_path = os.path.join(args.output_dir, 'baselineFC_vs_deltaYBOCS_network_fc.csv')
                 regression_results.to_csv(output_path, index=False)
-                logging.info("Saved baseline FC regression results to %s", output_path)
+                logging.info("Saved baseline FC regression results to %s with columns: %s",
+                            output_path, list(regression_results.columns))
             else:
                 logging.info("No significant baseline FC regression results to save")
 
@@ -343,12 +349,13 @@ def main():
             regression_results = run_regression(
                 fc_change_data.set_index('subject_id'),
                 ocd_df.set_index('subject_id')['delta_ybocs'],
-                feature_columns
+                feature_info
             )
             if not regression_results.empty:
                 output_path = os.path.join(args.output_dir, 'deltaFC_vs_deltaYBOCS_network_fc.csv')
                 regression_results.to_csv(output_path, index=False)
-                logging.info("Saved FC change regression results to %s", output_path)
+                logging.info("Saved FC change regression results to %s with columns: %s",
+                            output_path, list(regression_results.columns))
             else:
                 logging.info("No significant FC change regression results to save")
         else:
