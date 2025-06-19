@@ -164,30 +164,6 @@ def validate_paths(subject, session):
     logger.info(f"Found mask: {mask_path}, fMRI: {fmri_path}, confounds: {confounds_path}")
     return mask_path, fmri_path, confounds_path
 
-def validate_confounds(confounds_file):
-    """Validate confounds file for required columns."""
-    try:
-        confounds_df = pd.read_csv(confounds_file, sep='\t')
-        required_cols = ['framewise_displacement']
-        compcor_cols = [col for col in confounds_df.columns if 'a_compcor' in col]
-        motion_cols = [
-            'trans_x', 'trans_y', 'trans_z',
-            'rot_x', 'rot_y', 'rot_z',
-            'trans_x_derivative1', 'trans_y_derivative1', 'trans_z_derivative1',
-            'rot_x_derivative1', 'rot_y_derivative1', 'rot_z_derivative1'
-        ]
-        missing_cols = [col for col in required_cols if col not in confounds_df.columns]
-        available_motion = [col for col in motion_cols if col in confounds_df.columns]
-        logger.debug(f"Confounds file {confounds_file}: {len(compcor_cols)} aCompCor cols, {len(available_motion)} motion cols")
-        if missing_cols or len(compcor_cols) < 5 or len(available_motion) < 6:
-            logger.error(f"Confounds file {confounds_file} missing required columns: {missing_cols}, "
-                        f"found {len(compcor_cols)} aCompCor, {len(available_motion)} motion cols")
-            return None
-        return confounds_df
-    except Exception as e:
-        logger.error(f"Failed to validate confounds file {confounds_file}: {str(e)}")
-        return None
-
 def resample_to_atlas_space(img, target_img, output_path, interpolation='continuous'):
     """Resample an image to the space of the target image."""
     try:
@@ -208,13 +184,19 @@ def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
     try:
         logger.info(f"Processing run: fMRI={fmri_file}, confounds={confounds_file}, output={output_prefix}")
         # Validate inputs
+        if not os.path.exists(fmri_file):
+            logger.error(f"fMRI file does not exist: {fmri_file}")
+            return None
+        if not os.path.exists(brain_mask):
+            logger.error(f"Brain mask file does not exist: {brain_mask}")
+            return None
+        if not os.path.exists(confounds_file):
+            logger.error(f"Confounds file does not exist: {confounds_file}")
+            return None
+
         fmri_img = image.load_img(fmri_file)
         brain_mask_img = image.load_img(brain_mask)
         logger.debug(f"fMRI shape: {fmri_img.shape}, mask shape: {brain_mask_img.shape}")
-        confounds_df = validate_confounds(confounds_file)
-        if confounds_df is None:
-            logger.error(f"Invalid confounds file {confounds_file}, skipping run")
-            return None
 
         # Resample fMRI and mask to atlas space
         logger.debug("Starting resampling")
@@ -230,21 +212,38 @@ def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
             return None
         logger.debug("Resampling completed")
 
-        # Load confounds
+        # Load confounds (adapted from provided script)
         logger.debug("Processing confounds")
-        compcor_cols = [col for col in confounds_df.columns if 'a_compcor' in col][:5]  # Top 5 aCompCor
-        motion_params = confounds_df[compcor_cols + [
-            'trans_x', 'trans_y', 'trans_z',
-            'rot_x', 'rot_y', 'rot_z',
-            'trans_x_derivative1', 'trans_y_derivative1', 'trans_z_derivative1',
-            'rot_x_derivative1', 'rot_y_derivative1', 'rot_z_derivative1'
-        ]].fillna(0)
-        fd_flags = confounds_df['framewise_displacement'].fillna(0) > 0.5
-        art_flags = fd_flags  # Simplified; add global signal if needed
-        valid_timepoints = ~art_flags
-        logger.info(f"Valid timepoints: {valid_timepoints.sum()}/{len(valid_timepoints)}")
-        if valid_timepoints.sum() < 10:
-            logger.warning(f"Too few valid timepoints ({valid_timepoints.sum()}) for {fmri_file}")
+        try:
+            confounds_df = pd.read_csv(confounds_file, sep='\t')
+            compcor_cols = [col for col in confounds_df.columns if 'a_comp_cor' in col or 'aCompCor' in col][:5]  # Top 5 aCompCor
+            motion_cols = [
+                'trans_x', 'trans_y', 'trans_z',
+                'rot_x', 'rot_y', 'rot_z',
+                'trans_x_derivative1', 'trans_y_derivative1', 'trans_z_derivative1',
+                'rot_x_derivative1', 'rot_y_derivative1', 'rot_z_derivative1'
+            ]
+            available_motion = [col for col in motion_cols if col in confounds_df.columns]
+            selected_cols = compcor_cols + available_motion
+            logger.debug(f"Confounds file {confounds_file}: {len(compcor_cols)} aCompCor cols, {len(available_motion)} motion cols, selected: {selected_cols}")
+            if not selected_cols:
+                logger.warning(f"No valid confounds columns in {confounds_file}, proceeding with empty confounds")
+                motion_params = pd.DataFrame(index=confounds_df.index)
+            else:
+                motion_params = confounds_df[selected_cols].fillna(0)
+            if 'framewise_displacement' not in confounds_df.columns:
+                logger.warning(f"No framewise_displacement in {confounds_file}, assuming no excessive motion")
+                fd_flags = pd.Series([False] * len(confounds_df))
+            else:
+                fd_flags = confounds_df['framewise_displacement'].fillna(0) > 0.5
+            art_flags = fd_flags  # Simplified; add global signal if needed
+            valid_timepoints = ~art_flags
+            logger.info(f"Valid timepoints: {valid_timepoints.sum()}/{len(valid_timepoints)}")
+            if valid_timepoints.sum() < 10:
+                logger.warning(f"Too few valid timepoints ({valid_timepoints.sum()}) for {fmri_file}")
+                return None
+        except Exception as e:
+            logger.error(f"Failed to load confounds file {confounds_file}: {str(e)}")
             return None
         logger.debug("Confounds processed")
 
@@ -260,9 +259,9 @@ def process_run(fmri_file, confounds_file, atlas, brain_mask, output_prefix):
             low_pass=0.1,
             high_pass=0.01,
             t_r=2.0,
-            confounds=motion_params[valid_timepoints]
+            confounds=motion_params[valid_timepoints] if not motion_params.empty else None
         )
-        time_series = masker.fit_transform(fmri_img, confounds=motion_params[valid_timepoints])
+        time_series = masker.fit_transform(fmri_img, confounds=motion_params[valid_timepoints] if not motion_params.empty else None)
         logger.info(f"Extracted time series with shape: {time_series.shape}")
         if time_series.shape[0] < 10:
             logger.error(f"Time series too short ({time_series.shape[0]} timepoints), skipping run")
@@ -403,11 +402,13 @@ def main():
         logger.info(f"Loaded Power 2011 atlas: {power_atlas_path}")
         for subject in subjects:
             logger.info(f"Processing subject: {subject}")
+            processed_any = False
             for session in sessions:
                 try:
                     logger.info(f"Processing session: {session}")
                     brain_mask_path, fmri_file, confounds_file = validate_paths(subject, session)
                     if not brain_mask_path or not fmri_file or not confounds_file:
+                        logger.warning(f"Skipping session {session} for {subject} due to missing files")
                         continue
                     logger.info(f"Found confounds file: {confounds_file}")
                     run_match = re.search(r'_run-(\d+)_', fmri_file)
@@ -450,11 +451,13 @@ def main():
                         )
                         os.rename(src_network_csv, avg_network_csv)
                         logger.info(f"Moved single network summary to: {avg_network_csv}")
+                        processed_any = True
+                    else:
+                        logger.warning(f"No results generated for {subject} {session}")
                 except Exception as e:
                     logger.error(f"Failed to process {subject} {session}: {str(e)}")
                     continue
-            if not any(os.path.exists(os.path.join(output_dir, f'{subject}_{session}_task-rest_power2011_roiroi_matrix_avg.npy'))
-                       for session in sessions):
+            if not processed_any:
                 logger.error(f"No FC matrices generated for {subject}")
     except Exception as e:
         logger.error(f"Main function failed: {str(e)}")

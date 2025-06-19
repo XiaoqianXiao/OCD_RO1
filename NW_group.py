@@ -10,7 +10,7 @@ import logging
 # Configure logging
 def setup_logging(output_dir):
     """Set up logging to console and file."""
-    log_file = os.path.join(output_dir, 'network_group_analysis.log')
+    log_file = os.path.join(output_dir, 'roi_network_group_analysis.log')
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -22,11 +22,11 @@ def setup_logging(output_dir):
     logging.info("Logging initialized. Output will be saved to %s", log_file)
 
 # Parse command-line arguments
-parser = argparse.ArgumentParser(description='Network-level FC group analysis')
+parser = argparse.ArgumentParser(description='ROI-to-network FC group analysis')
 parser.add_argument('--subjects_csv', type=str, required=True, help='Path to group.csv')
 parser.add_argument('--clinical_csv', type=str, required=True, help='Path to clinical.csv')
 parser.add_argument('--output_dir', type=str, default='/scratch/xxqian/OCD/NW_group', help='Output directory')
-parser.add_argument('--input_dir', type=str, default='/input', help='Input directory for FC data')
+parser.add_argument('--input_dir', type=str, default='/scratch/xxqian/OCD', help='Input directory for FC data')
 args = parser.parse_args()
 
 # Create output directory and set up logging
@@ -36,7 +36,7 @@ logging.info("Starting analysis with arguments: %s", vars(args))
 
 # Helper Functions
 def get_network_fc_path(subject, session, input_dir):
-    """Get path to network FC CSV file."""
+    """Get path to ROI-to-network FC CSV file."""
     if not subject.startswith('sub-'):
         subject = f"sub-{subject}"
     path = os.path.join(input_dir, f"{subject}_{session}_task-rest_power2011_network_fc_avg.csv")
@@ -55,8 +55,8 @@ def get_group(subject_id, metadata_df):
     return group.iloc[0]
 
 def run_ttest(fc_data_hc, fc_data_ocd, feature_info):
-    """Run two-sample t-tests with FDR correction."""
-    logging.info("Running t-tests for %d features", len(feature_info))
+    """Run two-sample t-tests with FDR correction for ROI-to-network FC."""
+    logging.info("Running t-tests for %d ROI-to-network features", len(feature_info))
     results = []
     for feature, (net1, net2) in feature_info.items():
         hc_values = fc_data_hc[feature].dropna()
@@ -68,9 +68,9 @@ def run_ttest(fc_data_hc, fc_data_ocd, feature_info):
             continue
         t_stat, p_val = stats.ttest_ind(ocd_values, hc_values, equal_var=False)
         results.append({
+            'ROI': feature,
             'network1': net1,
             'network2': net2,
-            'Feature': feature,
             't_statistic': t_stat,
             'p_value': p_val,
             'OCD_mean': np.mean(ocd_values),
@@ -89,8 +89,8 @@ def run_ttest(fc_data_hc, fc_data_ocd, feature_info):
     return results_df
 
 def run_regression(fc_data, y_values, feature_info):
-    """Run linear regression with FDR correction."""
-    logging.info("Running regressions for %d features", len(feature_info))
+    """Run linear regression with FDR correction for ROI-to-network FC."""
+    logging.info("Running regressions for %d ROI-to-network features", len(feature_info))
     results = []
     fc_data.index = fc_data.index.astype(str)
     y_values.index = y_values.index.astype(str)
@@ -108,22 +108,22 @@ def run_regression(fc_data, y_values, feature_info):
             logging.warning("Skipping feature %s (%s_%s) due to empty data", feature, net1, net2)
             continue
         y = y_values.loc[x.index].dropna()
-        logging.debug("Feature %s (%s_%s): n=%d", feature, net1, net2, len(x))
+        logging.debug("Feature %s (%s_%s): n=%d", feature, net1, net2, len(y))
         if len(x) < 2 or len(y) < 2:
-            logging.warning("Skipping feature %s (%s_%s) due to insufficient data (n=%d)", feature, net1, net2, len(x))
+            logging.warning("Skipping feature %s (%s_%s) due to insufficient data (n=%d)", feature, net1, net2, len(y))
             continue
         x = x.values.reshape(-1, 1)
         y = y.values
         slope, intercept, r_value, p_val, _ = stats.linregress(x.flatten(), y)
         results.append({
+            'ROI': feature,
             'network1': net1,
             'network2': net2,
-            'Feature': feature,
             'slope': slope,
             'intercept': intercept,
             'r_value': r_value,
             'p_value': p_val,
-            'n': len(x)
+            'n': len(y)
         })
     if not results:
         logging.info("No regression results generated (no valid features)")
@@ -158,7 +158,7 @@ def load_and_validate_metadata(subjects_csv, clinical_csv):
     return df, df_clinical
 
 def validate_subjects(fc_dir, metadata_df):
-    """Validate subjects based on available network FC files."""
+    """Validate subjects based on available ROI-to-network FC files."""
     logging.info("Validating subjects in FC directory %s", fc_dir)
     fc_files = glob.glob(os.path.join(fc_dir, '*_task-rest_power2011_network_fc_avg.csv'))
     logging.info("Found %d FC files", len(fc_files))
@@ -190,24 +190,24 @@ def validate_subjects(fc_dir, metadata_df):
     return valid_group, valid_longitudinal, subject_sessions
 
 def validate_network_fc_file(fc_path):
-    """Validate that network FC file has required columns."""
+    """Validate that ROI-to-network FC file has required columns."""
     required_columns = {'ROI', 'network1', 'network2', 'fc_value'}
     try:
         df = pd.read_csv(fc_path)
         missing_columns = required_columns - set(df.columns)
         if missing_columns:
-            logging.error("Network FC file %s missing required columns: %s. Found columns: %s",
+            logging.error("ROI-to-network FC file %s missing required columns: %s. Found columns: %s",
                          fc_path, missing_columns, list(df.columns))
             return False
-        logging.debug("Network FC file %s validated successfully", fc_path)
+        logging.debug("ROI-to-network FC file %s validated successfully", fc_path)
         return True
     except Exception as e:
-        logging.error("Failed to validate network FC file %s: %s", fc_path, e)
+        logging.error("Failed to validate ROI-to-network FC file %s: %s", fc_path, e)
         return False
 
 def load_network_fc_data(subject_ids, session, input_dir):
-    """Load network-level FC data for given subjects and session."""
-    logging.info("Loading network FC data for %d subjects, session %s", len(subject_ids), session)
+    """Load ROI-to-network FC data for given subjects and session."""
+    logging.info("Loading ROI-to-network FC data for %d subjects, session %s", len(subject_ids), session)
     fc_data = []
     feature_info = None
     valid_subjects = 0
@@ -215,19 +215,19 @@ def load_network_fc_data(subject_ids, session, input_dir):
         sid_no_prefix = sid.replace('sub-', '')
         fc_path = get_network_fc_path(sid_no_prefix, session, input_dir)
         if not os.path.exists(fc_path):
-            logging.warning("Network FC file not found: %s", fc_path)
+            logging.warning("ROI-to-network FC file not found: %s", fc_path)
             continue
         if not validate_network_fc_file(fc_path):
             continue
         try:
             fc_df = pd.read_csv(fc_path)
-            logging.debug("Loaded network FC file %s with %d rows", fc_path, len(fc_df))
+            logging.debug("Loaded ROI-to-network FC file %s with %d rows", fc_path, len(fc_df))
             # Create feature identifier and map networks
             fc_df['feature_id'] = fc_df['ROI']
             if feature_info is None:
                 feature_info = {row['ROI']: (row['network1'], row['network2'])
                                for _, row in fc_df[['ROI', 'network1', 'network2']].drop_duplicates().iterrows()}
-                logging.debug("Identified %d feature columns with network mappings", len(feature_info))
+                logging.debug("Identified %d ROI-to-network feature columns with network mappings", len(feature_info))
             # Pivot to make features as columns
             fc_pivot = fc_df.pivot_table(
                 index=None,
@@ -238,18 +238,18 @@ def load_network_fc_data(subject_ids, session, input_dir):
             fc_data.append(fc_pivot)
             valid_subjects += 1
         except Exception as e:
-            logging.error("Failed to process network FC file %s: %s", fc_path, e)
+            logging.error("Failed to process ROI-to-network FC file %s: %s", fc_path, e)
             continue
     if not fc_data:
-        logging.warning("No valid network FC data loaded for session %s", session)
+        logging.warning("No valid ROI-to-network FC data loaded for session %s", session)
         return pd.DataFrame(), feature_info
     fc_data_df = pd.concat(fc_data, ignore_index=True)
-    logging.info("Loaded network FC data for %d subjects, %d features", valid_subjects, len(feature_info))
+    logging.info("Loaded ROI-to-network FC data for %d subjects, %d features", valid_subjects, len(feature_info))
     return fc_data_df, feature_info
 
 # Main Analysis
 def main():
-    logging.info("Starting main analysis")
+    logging.info("Starting main ROI-to-network FC analysis")
     # Load metadata
     df, df_clinical = load_and_validate_metadata(args.subjects_csv, args.clinical_csv)
 
@@ -264,10 +264,10 @@ def main():
         logging.error("No valid subjects found for any analysis")
         raise ValueError("No valid subjects found for any analysis.")
 
-    # Load baseline network FC data
+    # Load baseline ROI-to-network FC data
     baseline_fc_data, feature_info = load_network_fc_data(valid_group, 'ses-baseline', args.input_dir)
     if baseline_fc_data.empty:
-        logging.warning("No baseline network FC data loaded. Skipping group and longitudinal analyses.")
+        logging.warning("No baseline ROI-to-network FC data loaded. Skipping group and longitudinal analyses.")
         return
 
     # 1. Group difference at baseline
@@ -278,7 +278,7 @@ def main():
         if not hc_data.empty and not ocd_data.empty:
             ttest_results = run_ttest(hc_data, ocd_data, feature_info)
             if not ttest_results.empty:
-                output_path = os.path.join(args.output_dir, 'group_diff_baseline_network_fc.csv')
+                output_path = os.path.join(args.output_dir, 'group_diff_baseline_roi_network_fc.csv')
                 ttest_results.to_csv(output_path, index=False)
                 logging.info("Saved t-test results to %s with columns: %s", output_path, list(ttest_results.columns))
             else:
@@ -295,7 +295,7 @@ def main():
 
         # Baseline FC vs symptom change
         baseline_fc_ocd = baseline_fc_data[baseline_fc_data['subject_id'].isin(ocd_df['subject_id'])]
-        logging.info("Baseline network FC for OCD: n=%d", len(baseline_fc_ocd))
+        logging.info("Baseline ROI-to-network FC for OCD: n=%d", len(baseline_fc_ocd))
         if not baseline_fc_ocd.empty:
             regression_results = run_regression(
                 baseline_fc_ocd.set_index('subject_id'),
@@ -303,7 +303,7 @@ def main():
                 feature_info
             )
             if not regression_results.empty:
-                output_path = os.path.join(args.output_dir, 'baselineFC_vs_deltaYBOCS_network_fc.csv')
+                output_path = os.path.join(args.output_dir, 'baselineFC_vs_deltaYBOCS_roi_network_fc.csv')
                 regression_results.to_csv(output_path, index=False)
                 logging.info("Saved baseline FC regression results to %s with columns: %s",
                             output_path, list(regression_results.columns))
@@ -317,7 +317,7 @@ def main():
             base_path = get_network_fc_path(sid, 'ses-baseline', args.input_dir)
             follow_path = get_network_fc_path(sid, 'ses-followup', args.input_dir)
             if not (os.path.exists(base_path) and os.path.exists(follow_path)):
-                logging.warning("Missing network FC files for subject %s (baseline: %s, followup: %s)",
+                logging.warning("Missing ROI-to-network FC files for subject %s (baseline: %s, followup: %s)",
                                sid, os.path.exists(base_path), os.path.exists(follow_path))
                 continue
             if not (validate_network_fc_file(base_path) and validate_network_fc_file(follow_path)):
@@ -325,7 +325,7 @@ def main():
             try:
                 base_fc = pd.read_csv(base_path)
                 follow_fc = pd.read_csv(follow_path)
-                logging.debug("Loaded baseline network FC (%d rows) and followup FC (%d rows) for %s",
+                logging.debug("Loaded baseline ROI-to-network FC (%d rows) and followup FC (%d rows) for %s",
                              len(base_fc), len(follow_fc), sid)
                 base_fc['feature_id'] = base_fc['ROI']
                 follow_fc['feature_id'] = follow_fc['ROI']
@@ -337,14 +337,14 @@ def main():
                 change_pivot['subject_id'] = sid
                 fc_change_data.append(change_pivot)
             except Exception as e:
-                logging.error("Failed to process longitudinal network FC for subject %s: %s", sid, e)
+                logging.error("Failed to process longitudinal ROI-to-network FC for subject %s: %s", sid, e)
                 continue
 
         if fc_change_data:
             fc_change_data = pd.concat(fc_change_data, ignore_index=True)
             fc_change_data['subject_id'] = fc_change_data['subject_id'].astype(str)
             feature_columns = [col for col in fc_change_data.columns if col != 'subject_id']
-            logging.info("Loaded network FC change data for %d subjects, %d features",
+            logging.info("Loaded ROI-to-network FC change data for %d subjects, %d features",
                         len(fc_change_data), len(feature_columns))
             regression_results = run_regression(
                 fc_change_data.set_index('subject_id'),
@@ -352,16 +352,16 @@ def main():
                 feature_info
             )
             if not regression_results.empty:
-                output_path = os.path.join(args.output_dir, 'deltaFC_vs_deltaYBOCS_network_fc.csv')
+                output_path = os.path.join(args.output_dir, 'deltaFC_vs_deltaYBOCS_roi_network_fc.csv')
                 regression_results.to_csv(output_path, index=False)
                 logging.info("Saved FC change regression results to %s with columns: %s",
                             output_path, list(regression_results.columns))
             else:
                 logging.info("No significant FC change regression results to save")
         else:
-            logging.warning("No network FC change data loaded for longitudinal analysis")
+            logging.warning("No ROI-to-network FC change data loaded for longitudinal analysis")
 
-    logging.info("Main analysis completed")
+    logging.info("Main ROI-to-network FC analysis completed")
 
 if __name__ == "__main__":
     try:
