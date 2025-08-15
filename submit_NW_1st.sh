@@ -655,7 +655,7 @@ if [[ -z "$SUBJECTS" ]]; then
     echo "Discovering subjects in BIDS directory: $BIDS_DIR"
     
     # Find subjects and check if any were found
-    local found_subjects=$(find "$BIDS_DIR" -maxdepth 1 -type d -name "sub-*" 2>/dev/null | sort)
+    found_subjects=$(find "$BIDS_DIR" -maxdepth 1 -type d -name "sub-*" 2>/dev/null | sort)
     
     if [[ -z "$found_subjects" ]]; then
         echo "Error: No subjects found in BIDS directory: $BIDS_DIR"
