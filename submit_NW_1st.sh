@@ -203,6 +203,7 @@ OPTIONS:
   --atlas-name NAME        Custom atlas name for output files
           --output-dir DIR         Output directory (default: /scratch/xxqian/OCD)
         --work-dir DIR           Work directory (default: /scratch/xxqian/work_flow)
+        --slurm-scripts-dir DIR  SLURM scripts directory (default: /scratch/xxqian/slurm_jobs)
           --bids-dir DIR           BIDS directory (default: /project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1)
           --roi-dir DIR            ROI directory (default: /scratch/xxqian/roi)
   --time TIME              SLURM time limit (default: 2:00:00)
@@ -490,6 +491,10 @@ while [[ $# -gt 0 ]]; do
             WORK_DIR="$2"
             shift 2
             ;;
+        --slurm-scripts-dir)
+            SLURM_SCRIPTS_DIR="$2"
+            shift 2
+            ;;
         --bids-dir)
             BIDS_DIR="$2"
             shift 2
@@ -542,6 +547,7 @@ done
 BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
 OUTPUT_DIR="/scratch/xxqian/OCD"
 WORK_DIR="/scratch/xxqian/work_flow"
+SLURM_SCRIPTS_DIR="/scratch/xxqian/slurm_jobs"
 ROI_DIR="/scratch/xxqian/roi"
 CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
 PYTHON_SCRIPT="/scratch/xxqian/repo/OCD_RO1/NW_1st.py"
@@ -624,6 +630,7 @@ fi
 # Create output and work directories
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$WORK_DIR"
+mkdir -p "$SLURM_SCRIPTS_DIR"
 
 # Check SLURM account and partition access
 echo "Checking SLURM account access..."
@@ -695,6 +702,7 @@ echo "=" * 80
 echo "BIDS Directory: $BIDS_DIR"
 echo "Output Directory: $OUTPUT_DIR"
 echo "Work Directory: $WORK_DIR"
+echo "SLURM Scripts Directory: $SLURM_SCRIPTS_DIR"
 echo "ROI Directory: $ROI_DIR"
 echo "Atlas: $ATLAS"
 if [[ -n "$ATLAS_PARAMS" ]]; then
@@ -748,7 +756,7 @@ for subject in "${SUBJECT_ARRAY[@]}"; do
     fi
     
     # Create SLURM job script
-    job_script="$subject_work_dir/submit_${subject}.sh"
+    job_script="$SLURM_SCRIPTS_DIR/submit_${subject}.sh"
     
     cat > "$job_script" << EOF
 #!/bin/bash
