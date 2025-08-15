@@ -49,6 +49,7 @@ set -euo pipefail
 BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
 OUTPUT_DIR="/scratch/xxqian/OCD"
 WORK_DIR="/scratch/xxqian/work_flow"
+SLURM_SCRIPTS_DIR="/scratch/xxqian/slurm_jobs"
 ROI_DIR="/scratch/xxqian/roi"
 
 # Default SLURM parameters
@@ -97,7 +98,8 @@ OPTIONS:
   --atlas-name NAME        Custom atlas name for output files
   --expected-rois N        Expected number of ROIs for validation
   --output-dir DIR         Output directory (default: /scratch/xxqian/OCD)
-  --work-dir DIR           Work directory (default: /scratch/xxqian/work_flow)
+          --work-dir DIR           Work directory (default: /scratch/xxqian/work_flow)
+        --slurm-scripts-dir DIR  SLURM scripts directory (default: /scratch/xxqian/slurm_jobs)
           --bids-dir DIR           BIDS directory (default: /project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1)
           --roi-dir DIR            ROI directory (default: /scratch/xxqian/roi)
   --time TIME              SLURM time limit (default: 2:00:00)
@@ -361,6 +363,10 @@ while [[ $# -gt 0 ]]; do
             WORK_DIR="$2"
             shift 2
             ;;
+        --slurm-scripts-dir)
+            SLURM_SCRIPTS_DIR="$2"
+            shift 2
+            ;;
         --bids-dir)
             BIDS_DIR="$2"
             shift 2
@@ -448,6 +454,7 @@ fi
 # Create output and work directories
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$WORK_DIR"
+mkdir -p "$SLURM_SCRIPTS_DIR"
 
 # =============================================================================
 # SUBJECT DISCOVERY
@@ -477,11 +484,16 @@ echo "=" * 80
 echo "BIDS Directory: $BIDS_DIR"
 echo "Output Directory: $OUTPUT_DIR"
 echo "Work Directory: $WORK_DIR"
+echo "SLURM Scripts Directory: $SLURM_SCRIPTS_DIR"
 echo "ROI Directory: $ROI_DIR"
 echo "Atlas: $ATLAS"
 if [[ -n "$ATLAS_PARAMS" ]]; then
     echo "Atlas Parameters: $ATLAS_PARAMS"
 fi
+
+# Define bind paths for Apptainer, avoiding redundant mounts
+APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian:/scratch/xxqian,/scratch/xxqian/repo/OCD_RO1/ROI_1st.py:/app/ROI_1st.py"
+
 if [[ -n "$LABELS" ]]; then
     echo "Labels: $LABELS"
 fi
@@ -510,7 +522,7 @@ for subject in "${SUBJECT_ARRAY[@]}"; do
     mkdir -p "$subject_work_dir"
     
     # Build Python command
-    python_cmd="python /scripts/ROI_1st.py --subject $subject --atlas $ATLAS --label-pattern $LABEL_PATTERN"
+    python_cmd="python3 /app/ROI_1st.py --subject $subject --atlas $ATLAS --label-pattern $LABEL_PATTERN"
     
     if [[ -n "$ATLAS_PARAMS" ]]; then
         python_cmd="$python_cmd --atlas-params '$ATLAS_PARAMS'"
@@ -537,7 +549,7 @@ for subject in "${SUBJECT_ARRAY[@]}"; do
     fi
     
     # Create SLURM job script
-    job_script="$subject_work_dir/submit_${subject}.sh"
+    job_script="$SLURM_SCRIPTS_DIR/ROI_1st_${subject}.slurm"
     
     cat > "$job_script" << EOF
 #!/bin/bash
@@ -564,11 +576,7 @@ echo "Working directory: \$SLURM_SUBMIT_DIR"
 # Run the analysis
 echo "Starting ROI_1st.py analysis for $subject"
 apptainer exec \\
-  --bind $BIDS_DIR:/input \\
-  --bind $OUTPUT_DIR:/output \\
-  --bind $subject_work_dir:/work \\
-  --bind $ROI_DIR:/roi \\
-  --bind /scratch/xxqian/repo/OCD_RO1:/scripts \\
+  --bind $APPTAINER_BIND \\
   $CONTAINER \\
   $python_cmd
 

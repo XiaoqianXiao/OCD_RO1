@@ -170,7 +170,7 @@ validate_job_script() {
         return 1
     fi
     
-    if ! grep -q "python.*$PYTHON_SCRIPT" "$job_script"; then
+    if ! grep -q "python3.*/app/NW_1st.py" "$job_script"; then
         echo "ERROR: Job script missing Python execution: $job_script"
         return 1
     fi
@@ -724,6 +724,9 @@ echo "SLURM CPUs: $SLURM_CPUS"
 echo "Subjects: $SUBJECTS"
 echo "=" * 80
 
+# Define bind paths for Apptainer, avoiding redundant mounts
+APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian:/scratch/xxqian,/scratch/xxqian/repo/OCD_RO1/NW_1st.py:/app/NW_1st.py"
+
 # Submit jobs for each subject
 for subject in "${SUBJECT_ARRAY[@]}"; do
     echo "Processing subject: $subject"
@@ -733,7 +736,7 @@ for subject in "${SUBJECT_ARRAY[@]}"; do
     mkdir -p "$subject_work_dir"
     
     # Build Python command
-    python_cmd="python /scripts/NW_1st.py --subject $subject --atlas $ATLAS --label-pattern $LABEL_PATTERN"
+    python_cmd="python3 /app/NW_1st.py --subject $subject --atlas $ATLAS --label-pattern $LABEL_PATTERN"
     
     if [[ -n "$ATLAS_PARAMS" ]]; then
         python_cmd="$python_cmd --atlas-params '$ATLAS_PARAMS'"
@@ -783,11 +786,7 @@ echo "Working directory: \$SLURM_SUBMIT_DIR"
 # Run the analysis
 echo "Starting NW_1st.py analysis for $subject"
 apptainer exec \\
-  --bind $BIDS_DIR:/input \\
-  --bind $OUTPUT_DIR:/output \\
-  --bind $subject_work_dir:/work \\
-  --bind $ROI_DIR:/roi \\
-  --bind /scratch/xxqian/repo/OCD_RO1:/scripts \\
+  --bind $APPTAINER_BIND \\
   $CONTAINER \\
   $python_cmd
 
