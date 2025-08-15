@@ -35,7 +35,7 @@ warnings.filterwarnings('ignore')
 
 # Default configuration
 DEFAULT_CONFIG = {
-    'project_dir': '/project/6079231/dliang55/R01_AOCD',
+    'project_dir': '/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1',
     'bids_dir': '/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1',
     'scratch_dir': '/scratch/xxqian',
     'output_dir': '/project/6079231/dliang55/R01_AOCD',

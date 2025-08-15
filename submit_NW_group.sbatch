@@ -54,7 +54,7 @@ set -euo pipefail
 # =============================================================================
 
 # Default configuration
-BIDS_DIR="/project/6079231/dliang55/R01_AOCD"
+BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
 OUTPUT_DIR="/scratch/xxqian/OCD/NW_group"
 WORK_DIR="/scratch/xxqian/OCD/work"
 ROI_DIR="/scratch/xxqian/OCD/roi"

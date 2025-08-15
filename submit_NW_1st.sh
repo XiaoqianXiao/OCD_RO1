@@ -203,7 +203,7 @@ OPTIONS:
   --atlas-name NAME        Custom atlas name for output files
           --output-dir DIR         Output directory (default: /scratch/xxqian/OCD/results)
         --work-dir DIR           Work directory (default: /scratch/xxqian/OCD/work)
-          --bids-dir DIR           BIDS directory (default: /project/6079231/dliang55/R01_AOCD)
+          --bids-dir DIR           BIDS directory (default: /project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1)
           --roi-dir DIR            ROI directory (default: /scratch/xxqian/roi)
   --time TIME              SLURM time limit (default: 2:00:00)
   --mem MEM                SLURM memory limit (default: 16G)
@@ -539,7 +539,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Initialize variables with defaults
-BIDS_DIR="/project/6079231/dliang55/R01_AOCD"
+BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
 OUTPUT_DIR="/scratch/xxqian/OCD/results"
 WORK_DIR="/scratch/xxqian/OCD/work"
 ROI_DIR="/scratch/xxqian/roi"

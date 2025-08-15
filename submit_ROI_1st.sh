@@ -46,7 +46,7 @@ set -euo pipefail
 # =============================================================================
 
 # Default directories
-BIDS_DIR="/project/6079231/dliang55/R01_AOCD"
+BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
 OUTPUT_DIR="/scratch/xxqian/OCD/ROI_1stLevel"
 WORK_DIR="/scratch/xxqian/OCD/work"
 ROI_DIR="/scratch/xxqian/OCD/roi"
@@ -98,7 +98,7 @@ OPTIONS:
   --expected-rois N        Expected number of ROIs for validation
   --output-dir DIR         Output directory (default: /scratch/xxqian/OCD/ROI_1stLevel)
   --work-dir DIR           Work directory (default: /scratch/xxqian/OCD/work)
-  --bids-dir DIR           BIDS directory (default: /project/6079231/dliang55/R01_AOCD)
+          --bids-dir DIR           BIDS directory (default: /project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1)
           --roi-dir DIR            ROI directory (default: /scratch/xxqian/roi)
   --time TIME              SLURM time limit (default: 2:00:00)
   --mem MEM                SLURM memory limit (default: 16G)
@@ -167,7 +167,7 @@ DETAILED USAGE EXAMPLES
    - Use Harvard-Oxford cortical atlas
    - Submit jobs with 2:00:00 time limit and 16G memory
    - Save results to /scratch/xxqian/OCD/ROI_1stLevel
-   - Use BIDS directory: /project/6079231/dliang55/R01_AOCD
+   - Use BIDS directory: /project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1
 
 2. SPECIFIC SUBJECTS
    ------------------
