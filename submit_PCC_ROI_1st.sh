@@ -40,7 +40,7 @@ set -euo pipefail
 # =============================================================================
 
 # Default directories
-BIDS_DIR="/scratch/xxqian/OCD"
+BIDS_DIR="/project/6079231/dliang55/R01_AOCD"
 OUTPUT_DIR="/scratch/xxqian/OCD/PCC_ROI_1stLevel"
 WORK_DIR="/scratch/xxqian/OCD/work"
 ROI_DIR="/scratch/xxqian/OCD/roi"
@@ -61,7 +61,7 @@ VERBOSE=""
 
 # Container and Python script
 CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
-PYTHON_SCRIPT="ROI_1st.py"
+PYTHON_SCRIPT="/scratch/xxqian/repo/OCD_RO1/ROI_1st.py"
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -96,8 +96,8 @@ OPTIONS:
   --expected-rois N        Expected number of ROIs for validation
   --output-dir DIR         Output directory (default: /scratch/xxqian/OCD/PCC_ROI_1stLevel)
   --work-dir DIR           Work directory (default: /scratch/xxqian/OCD/work)
-  --bids-dir DIR           BIDS directory (default: /scratch/xxqian/OCD)
-  --roi-dir DIR            ROI directory (default: /scratch/xxqian/OCD/roi)
+  --bids-dir DIR           BIDS directory (default: /project/6079231/dliang55/R01_AOCD)
+          --roi-dir DIR            ROI directory (default: /scratch/xxqian/roi)
   --time TIME              SLURM time limit (default: 2:00:00)
   --mem MEM                SLURM memory limit (default: 16G)
   --cpus CPUS              SLURM CPUs per task (default: 2)
@@ -473,7 +473,7 @@ for subject in "${SUBJECT_ARRAY[@]}"; do
     mkdir -p "$subject_work_dir"
     
     # Build Python command
-    python_cmd="python $PYTHON_SCRIPT --subject $subject --atlas $ATLAS --label-pattern $LABEL_PATTERN"
+    python_cmd="python /scripts/ROI_1st.py --subject $subject --atlas $ATLAS --label-pattern $LABEL_PATTERN"
     
     if [[ -n "$ATLAS_PARAMS" ]]; then
         python_cmd="$python_cmd --atlas-params '$ATLAS_PARAMS'"
@@ -531,7 +531,7 @@ apptainer exec \\
   --bind $OUTPUT_DIR:/output \\
   --bind $subject_work_dir:/work \\
   --bind $ROI_DIR:/roi \\
-  --bind \$(pwd):/scripts \\
+  --bind /scratch/xxqian/repo/OCD_RO1:/scripts \\
   $CONTAINER \\
   $python_cmd
 

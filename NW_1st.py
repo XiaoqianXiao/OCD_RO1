@@ -134,7 +134,7 @@ CONFIG = {
     'output_dir': '/scratch/xxqian/OCD',
     'work_dir': '/scratch/xxqian/work_flow',
     'roi_dir': '/scratch/xxqian/roi',
-    'log_file': '/scratch/xxqian/OCD/roi_to_roi_fc_analysis.log'
+    'log_file': '/project/6079231/dliang55/R01_AOCD/roi_to_roi_fc_analysis.log'
 }
 
 # Analysis parameters

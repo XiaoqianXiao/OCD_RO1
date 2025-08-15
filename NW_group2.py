@@ -80,7 +80,7 @@ warnings.filterwarnings('ignore')
 
 # Default configuration
 DEFAULT_CONFIG = {
-    'output_dir': '/scratch/xxqian/OCD/NW_group',
+    'output_dir': '/project/6079231/dliang55/R01_AOCD/NW_group',
     'input_dir': '/input',
     'log_file': 'network_fc_analysis.log',
     'sessions': ['ses-baseline', 'ses-followup'],

@@ -36,8 +36,9 @@ SCRIPT_PATH="/scratch/xxqian/repo/OCD_RO1/ROI_group.py"
 # Directory configuration
 PROJECT_DIR="/project/6079231/dliang55/R01_AOCD"
 SCRATCH_DIR="/scratch/xxqian"
-OUTPUT_DIR="${SCRATCH_DIR}/OCD/ROI_group"
-WORK_DIR="${SCRATCH_DIR}/work_flow"
+OUTPUT_DIR="/scratch/xxqian/OCD/ROI_group"
+WORK_DIR="/scratch/xxqian/OCD/work"
+ROI_DIR="/scratch/xxqian/OCD/roi"
 
 # Input data files
 SUBJECTS_CSV="${PROJECT_DIR}/metadata/shared_demographics.csv"

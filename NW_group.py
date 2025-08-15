@@ -80,8 +80,8 @@ warnings.filterwarnings('ignore')
 
 # Default configuration
 DEFAULT_CONFIG = {
-    'output_dir': '/scratch/xxqian/OCD/NW_group',
-    'input_dir': '/scratch/xxqian/OCD',
+    'output_dir': '/project/6079231/dliang55/R01_AOCD/NW_group',
+    'input_dir': '/project/6079231/dliang55/R01_AOCD',
     'log_file': 'roi_network_group_analysis.log',
     'sessions': ['ses-baseline', 'ses-followup'],
     'min_subjects_per_group': 2,

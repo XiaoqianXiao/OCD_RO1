@@ -32,7 +32,7 @@ warnings.filterwarnings('ignore')
 
 # Default configuration
 DEFAULT_CONFIG = {
-    'output_dir': '/scratch/xxqian/OCD/STV_group',
+    'output_dir': '/project/6079231/dliang55/R01_AOCD/STV_group',
     'work_dir': '/scratch/xxqian/work_flow',
     'log_file': 'seed_to_voxel_group_analysis.log',
     'sessions': ['ses-baseline', 'ses-followup'],
