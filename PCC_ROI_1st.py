@@ -35,10 +35,10 @@ warnings.filterwarnings('ignore')
 
 # Default configuration
 DEFAULT_CONFIG = {
-    'project_dir': '/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1',
+    'project_dir': '/project/6079231/dliang55/R01_AOCD',
     'bids_dir': '/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1',
     'scratch_dir': '/scratch/xxqian',
-    'output_dir': '/project/6079231/dliang55/R01_AOCD',
+    'output_dir': '/scratch/xxqian/OCD',
     'work_dir': '/scratch/xxqian/work_flow',
     'roi_dir': '/scratch/xxqian/roi',
     'log_file': 'pcc_power2011_fc_analysis.log',

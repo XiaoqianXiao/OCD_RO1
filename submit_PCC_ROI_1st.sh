@@ -41,9 +41,9 @@ set -euo pipefail
 
 # Default directories
 BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
-OUTPUT_DIR="/scratch/xxqian/OCD/PCC_ROI_1stLevel"
-WORK_DIR="/scratch/xxqian/OCD/work"
-ROI_DIR="/scratch/xxqian/OCD/roi"
+OUTPUT_DIR="/scratch/xxqian/OCD"
+WORK_DIR="/scratch/xxqian/work_flow"
+ROI_DIR="/scratch/xxqian/roi"
 
 # Default SLURM parameters
 SLURM_TIME="2:00:00"
@@ -94,8 +94,8 @@ OPTIONS:
   --custom-regex REGEX     Custom regex for label parsing
   --atlas-name NAME        Custom atlas name for output files
   --expected-rois N        Expected number of ROIs for validation
-  --output-dir DIR         Output directory (default: /scratch/xxqian/OCD/PCC_ROI_1stLevel)
-  --work-dir DIR           Work directory (default: /scratch/xxqian/OCD/work)
+          --output-dir DIR         Output directory (default: /scratch/xxqian/OCD)
+        --work-dir DIR           Work directory (default: /scratch/xxqian/work_flow)
           --bids-dir DIR           BIDS directory (default: /project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1)
           --roi-dir DIR            ROI directory (default: /scratch/xxqian/roi)
   --time TIME              SLURM time limit (default: 2:00:00)

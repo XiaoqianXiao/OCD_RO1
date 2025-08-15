@@ -201,8 +201,8 @@ OPTIONS:
   --label-pattern PATTERN  Label pattern type (default: power)
   --custom-regex REGEX     Custom regex for label parsing
   --atlas-name NAME        Custom atlas name for output files
-          --output-dir DIR         Output directory (default: /scratch/xxqian/OCD/results)
-        --work-dir DIR           Work directory (default: /scratch/xxqian/OCD/work)
+          --output-dir DIR         Output directory (default: /scratch/xxqian/OCD)
+        --work-dir DIR           Work directory (default: /scratch/xxqian/work_flow)
           --bids-dir DIR           BIDS directory (default: /project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1)
           --roi-dir DIR            ROI directory (default: /scratch/xxqian/roi)
   --time TIME              SLURM time limit (default: 2:00:00)
@@ -272,7 +272,7 @@ DETAILED USAGE EXAMPLES
    - Process all subjects in the BIDS directory
    - Use Power 2011 atlas with 264 ROIs
    - Submit jobs with 2:00:00 time limit and 16G memory
-           - Save results to /scratch/xxqian/OCD/results
+           - Save results to /scratch/xxqian/OCD
 
 2. SPECIFIC SUBJECTS
    ------------------
@@ -540,8 +540,8 @@ done
 
 # Initialize variables with defaults
 BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
-OUTPUT_DIR="/scratch/xxqian/OCD/results"
-WORK_DIR="/scratch/xxqian/OCD/work"
+OUTPUT_DIR="/scratch/xxqian/OCD"
+WORK_DIR="/scratch/xxqian/work_flow"
 ROI_DIR="/scratch/xxqian/roi"
 CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
 PYTHON_SCRIPT="/scratch/xxqian/repo/OCD_RO1/NW_1st.py"
