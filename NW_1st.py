@@ -117,6 +117,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any, Union
 import warnings
+import sys
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -1492,17 +1493,29 @@ def main():
         if args.atlas not in NILEARN_ATLASES:
             print(f"Error: '{args.atlas}' is not a valid Nilearn atlas")
             print("Available Nilearn atlases:", list(NILEARN_ATLASES.keys()))
+            print("\nRun with --list-atlases to see all available atlases and their parameters")
             return
     elif args.label_pattern == 'custom':
         # For custom pattern, regex is required
         if not args.custom_regex:
             print("Error: --custom-regex is required when --label-pattern is custom")
+            print("\nExample:")
+            print("  python NW_1st.py --subject sub-AOCD001 \\")
+            print("    --atlas /path/to/atlas.nii.gz \\")
+            print("    --labels /path/to/labels.txt \\")
+            print("    --label-pattern custom \\")
+            print("    --custom-regex 'network_(\\d+)_(.+)'")
             return
     else:
         # For power pattern, labels are required for custom atlases
         if args.atlas not in NILEARN_ATLASES and not args.labels:
             print("Error: --labels is required for custom atlases")
             print("Use --label-pattern nilearn for built-in Nilearn atlases")
+            print("\nExamples:")
+            print("  # For Nilearn atlases:")
+            print("  python NW_1st.py --subject sub-AOCD001 --atlas schaefer_2018 --label-pattern nilearn")
+            print("  # For custom atlases:")
+            print("  python NW_1st.py --subject sub-AOCD001 --atlas /path/to/atlas.nii.gz --labels /path/to/labels.txt --label-pattern power")
             return
     
     # Override default configuration with command line arguments
@@ -1620,9 +1633,46 @@ def main():
         logger.info("Functional Connectivity Analysis Completed")
         logger.info("=" * 80)
 
+def print_quick_help():
+    """Print quick help information."""
+    quick_help = """
+QUICK HELP - ROI-to-ROI and ROI-to-Network Functional Connectivity Analysis
+==========================================================================
+
+BASIC USAGE:
+  python NW_1st.py --subject <SUBJECT_ID> --atlas <ATLAS_NAME> --label-pattern <PATTERN>
+
+QUICK EXAMPLES:
+  1. Power 2011 Atlas (Default):
+     python NW_1st.py --subject sub-AOCD001 --atlas power_2011 --label-pattern power
+
+  2. Schaefer 2018 Atlas:
+     python NW_1st.py --subject sub-AOCD001 --atlas schaefer_2018 --label-pattern nilearn
+
+  3. Custom Atlas:
+     python NW_1st.py --subject sub-AOCD001 --atlas /path/to/atlas.nii.gz --labels /path/to/labels.txt --label-pattern power
+
+HELP OPTIONS:
+  --help          Show full help with all arguments
+  --usage         Show detailed usage examples
+  --list-atlases  List available Nilearn atlases and parameters
+
+For more information, run with --usage or --help.
+"""
+    print(quick_help)
+
 if __name__ == "__main__":
     try:
+        # Check for help requests first
+        if len(sys.argv) > 1 and sys.argv[1] in ['--help', '-h', 'help']:
+            print_quick_help()
+            sys.exit(0)
+        
         main()
     except Exception as e:
         logging.error("Main execution failed: %s", e)
+        print(f"\nError: {e}")
+        print("\nFor help, run: python NW_1st.py --help")
+        print("For usage examples, run: python NW_1st.py --usage")
+        print("For available atlases, run: python NW_1st.py --list-atlases")
         raise

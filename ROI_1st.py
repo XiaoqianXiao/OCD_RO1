@@ -129,6 +129,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any, Union
 import warnings
+import sys
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -505,6 +506,18 @@ TROUBLESHOOTING:
 """
     print(examples_text)
 
+def print_available_atlases():
+    """Print a list of available Nilearn atlases and their parameters."""
+    print("\nAvailable Nilearn Atlases:")
+    print("-" * 50)
+    for atlas_name, atlas_info in NILEARN_ATLASES.items():
+        print(f"- {atlas_name}:")
+        print(f"  Description: {atlas_info['description']}")
+        print(f"  Default Parameters: {atlas_info['default_params']}")
+        if atlas_info['param_options']:
+            print(f"  Parameter Options: {atlas_info['param_options']}")
+        print()
+
 # =============================================================================
 # ATLAS FETCHING FUNCTIONS
 # =============================================================================
@@ -576,9 +589,9 @@ def validate_atlas_params(atlas_name: str, atlas_params: Dict[str, Any]) -> Dict
 # LOGGING SETUP
 # =============================================================================
 
-def setup_logging(output_dir: str, log_filename: str) -> logging.Logger:
+def setup_logging(log_filename: str) -> logging.Logger:
     """Set up logging configuration with both file and console handlers."""
-    log_file = os.path.join(output_dir, log_filename)
+    log_file = os.path.join(DEFAULT_CONFIG['output_dir'], log_filename)
     log_dir = os.path.dirname(log_file)
     os.makedirs(log_dir, exist_ok=True)
     
@@ -1200,8 +1213,8 @@ def process_run(
 # =============================================================================
 
 def main():
-    """Main function to run ROI-to-ROI functional connectivity analysis."""
-    # Parse arguments
+    """Main function to process ROI-to-ROI functional connectivity analysis."""
+    # Parse command line arguments
     args = parse_arguments()
     
     # Handle usage and help requests
@@ -1216,15 +1229,28 @@ def main():
     # Validate arguments
     if args.label_pattern == 'nilearn':
         # For Nilearn atlases, labels are not needed
+        if args.atlas not in NILEARN_ATLASES:
+            print(f"Error: '{args.atlas}' is not a valid Nilearn atlas")
+            print("Available Nilearn atlases:", list(NILEARN_ATLASES.keys()))
+            print("\nRun with --list-atlases to see all available atlases and their parameters")
+            return
+        
+        # Atlas parameters are required for Nilearn atlases
         if not args.atlas_params:
-            print("Error: --atlas-params is required when using Nilearn atlases")
-            print("Example: --atlas-params '{\"n_rois\": 400, \"yeo_networks\": 7}'")
+            print(f"Error: --atlas-params is required for Nilearn atlas '{args.atlas}'")
+            print("\nExample:")
+            print(f"  python ROI_1st.py --subject sub-AOCD001 --atlas {args.atlas} --atlas-params '{{\"n_rois\": 400}}' --label-pattern nilearn")
             return
     else:
-        # For custom atlases, labels are required
+        # For non-Nilearn atlases, labels are required
         if not args.labels:
-            print("Error: --labels is required for custom atlases")
+            print("Error: --labels is required for non-Nilearn atlases")
             print("Use --label-pattern nilearn for built-in Nilearn atlases")
+            print("\nExamples:")
+            print("  # For Nilearn atlases:")
+            print("  python ROI_1st.py --subject sub-AOCD001 --atlas schaefer_2018 --atlas-params '{\"n_rois\": 400}' --label-pattern nilearn")
+            print("  # For custom atlases:")
+            print("  python ROI_1st.py --subject sub-AOCD001 --atlas /path/to/atlas.nii.gz --labels /path/to/labels.txt --label-pattern simple")
             return
     
     # Override default configuration with command line arguments
@@ -1235,7 +1261,7 @@ def main():
         config['work_dir'] = args.work_dir
     
     # Setup logging
-    logger = setup_logging(config['output_dir'], config['log_file'])
+    logger = setup_logging(config['log_file'])
     if args.verbose:
         logger.setLevel(logging.DEBUG)
     
@@ -1244,10 +1270,10 @@ def main():
     logger.info("=" * 80)
     logger.info(f"Subject: {args.subject}")
     logger.info(f"Atlas: {args.atlas}")
-    if args.labels:
-        logger.info(f"Labels: {args.labels}")
     if args.atlas_params:
         logger.info(f"Atlas parameters: {args.atlas_params}")
+    if args.labels:
+        logger.info(f"Labels: {args.labels}")
     logger.info(f"Label pattern: {args.label_pattern}")
     if args.custom_regex:
         logger.info(f"Custom regex: {args.custom_regex}")
@@ -1258,7 +1284,7 @@ def main():
         os.makedirs(config['output_dir'], exist_ok=True)
         os.makedirs(config['work_dir'], exist_ok=True)
         
-        # Load atlas and labels
+        # Load atlas and ROI labels
         logger.info("Setting up atlas and ROI labels...")
         
         if args.label_pattern == 'nilearn':
@@ -1371,7 +1397,7 @@ def main():
         if not processed_any:
             logger.error(f"No functional connectivity matrices generated for {args.subject}")
         else:
-            logger.info(f"Analysis completed successfully for {args.subject}")
+            logger.info(f"Analysis completed successfully for {args.subject} using atlas: {output_atlas_name}")
     
     except Exception as e:
         logger.error(f"Main execution failed: {str(e)}")
@@ -1382,9 +1408,46 @@ def main():
         logger.info("ROI-to-ROI Functional Connectivity Analysis Completed")
         logger.info("=" * 80)
 
+def print_quick_help():
+    """Print quick help information."""
+    quick_help = """
+QUICK HELP - ROI-to-ROI Functional Connectivity Analysis
+========================================================
+
+BASIC USAGE:
+  python ROI_1st.py --subject <SUBJECT_ID> --atlas <ATLAS_NAME> --label-pattern <PATTERN>
+
+QUICK EXAMPLES:
+  1. Nilearn Atlas (Schaefer 2018):
+     python ROI_1st.py --subject sub-AOCD001 --atlas schaefer_2018 --atlas-params '{"n_rois": 400}' --label-pattern nilearn
+
+  2. Custom Atlas with Simple Labels:
+     python ROI_1st.py --subject sub-AOCD001 --atlas /path/to/atlas.nii.gz --labels /path/to/labels.txt --label-pattern simple
+
+  3. Power 2011 Atlas:
+     python ROI_1st.py --subject sub-AOCD001 --atlas /path/to/power_atlas.nii.gz --labels /path/to/power_labels.txt --label-pattern power
+
+HELP OPTIONS:
+  --help          Show full help with all arguments
+  --usage         Show detailed usage examples
+  --list-atlases  List available Nilearn atlases and their parameters
+
+For more information, run with --usage or --help.
+"""
+    print(quick_help)
+
 if __name__ == "__main__":
     try:
+        # Check for help requests first
+        if len(sys.argv) > 1 and sys.argv[1] in ['--help', '-h', 'help']:
+            print_quick_help()
+            sys.exit(0)
+        
         main()
     except Exception as e:
         logging.error("Main execution failed: %s", e)
+        print(f"\nError: {e}")
+        print("\nFor help, run: python ROI_1st.py --help")
+        print("For usage examples, run: python ROI_1st.py --usage")
+        print("For available atlases, run: python ROI_1st.py --list-atlases")
         raise

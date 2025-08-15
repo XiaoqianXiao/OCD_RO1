@@ -1,343 +1,616 @@
 #!/bin/bash
+# =============================================================================
+# SLURM Job Submission Script for ROI_1st.py
+# =============================================================================
+# 
+# This script submits individual subject/session ROI-to-ROI functional connectivity
+# analysis jobs to the SLURM queue using ROI_1st.py. It processes ROI-to-ROI
+# connectivity matrices for resting-state fMRI data.
+#
+# USAGE:
+#   bash submit_ROI_1st.sh [OPTIONS]
+#
+# EXAMPLES:
+#   1. Submit all subjects with default settings:
+#      bash submit_ROI_1st.sh
+#
+#   2. Submit specific subjects:
+#      bash submit_ROI_1st.sh --subjects sub-AOCD001,sub-AOCD002
+#
+#   3. Submit with Nilearn atlas:
+#      bash submit_ROI_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 400}'
+#
+#   4. Submit with custom atlas:
+#      bash submit_ROI_1st.sh --atlas /path/to/atlas.nii.gz --labels /path/to/labels.txt
+#
+#   5. Submit with custom output directory:
+#      bash submit_ROI_1st.sh --output-dir /custom/output/path
+#
+#   6. Submit with verbose logging:
+#      bash submit_ROI_1st.sh --verbose
+#
+#   7. Submit with custom SLURM parameters:
+#      bash submit_ROI_1st.sh --time 4:00:00 --mem 32G --cpus 4
+#
+# HELP OPTIONS:
+#   --help          Show this help message
+#   --usage         Show detailed usage examples
+#
+# For more information, run with --usage or --help.
+# =============================================================================
 
-# =============================================================================
-# SLURM Job Submission Script for ROI-to-ROI Functional Connectivity Analysis
-# =============================================================================
-# This script submits individual SLURM jobs for each subject to run ROI_1st.py
-# using the Harvard-Oxford Atlas for ROI-to-ROI functional connectivity analysis.
-# =============================================================================
-
-set -euo pipefail  # Exit on error, undefined vars, pipe failures
+set -euo pipefail
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
-# Container and script paths
+# Default directories
+BIDS_DIR="/scratch/xxqian/OCD"
+OUTPUT_DIR="/scratch/xxqian/OCD/ROI_1stLevel"
+WORK_DIR="/scratch/xxqian/OCD/work"
+ROI_DIR="/scratch/xxqian/OCD/roi"
+
+# Default SLURM parameters
+SLURM_TIME="2:00:00"
+SLURM_MEM="16G"
+SLURM_CPUS="2"
+SLURM_ACCOUNT="xxqian"
+SLURM_MAIL_TYPE="END"
+SLURM_MAIL_USER="xxqian@stanford.edu"
+
+# Default analysis parameters
+DEFAULT_ATLAS="harvard_oxford"
+DEFAULT_LABEL_PATTERN="harvard_oxford"
+DEFAULT_LABELS="/scratch/xxqian/OCD/roi/HarvardOxford_cort_labels.txt"
+VERBOSE=""
+
+# Container and Python script
 CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
-SCRIPT_PATH="/scratch/xxqian/repo/OCD_RO1/ROI_1st.py"
-
-# Directory configuration
-BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
-OUTPUT_DIR="/scratch/xxqian/OCD"
-LOG_DIR="/scratch/xxqian/logs"
-TEMP_JOB_DIR="/scratch/xxqian/slurm_jobs"
-WORK_DIR="/scratch/xxqian/work_flow"
-
-# SLURM job configuration
-SLURM_CONFIG=(
-    "--mem=16G"
-    "--time=02:00:00"
-    "--cpus-per-task=2"
-    "--account=def-jfeusner"
-    "--mail-type=FAIL"
-    "--mail-user=$USER"
-)
+PYTHON_SCRIPT="ROI_1st.py"
 
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
 
-log_message() {
-    local level="$1"
-    shift
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [${level}] $*"
+print_help() {
+    cat << 'EOF'
+SLURM Job Submission Script for ROI_1st.py
+===========================================
+
+This script submits individual subject/session ROI-to-ROI functional connectivity
+analysis jobs to the SLURM queue using ROI_1st.py. It processes ROI-to-ROI
+connectivity matrices for resting-state fMRI data.
+
+BASIC USAGE:
+  bash submit_ROI_1st.sh [OPTIONS]
+
+OPTIONS:
+  --help                    Show this help message
+  --usage                   Show detailed usage examples
+  --subjects SUBJECTS       Comma-separated list of subjects (default: all)
+  --atlas ATLAS            Atlas name or path (default: harvard_oxford)
+  --atlas-params PARAMS    JSON string of atlas parameters
+  --labels LABELS          Path to labels file (default: Harvard-Oxford labels)
+  --label-pattern PATTERN  Label pattern type (default: harvard_oxford)
+  --custom-regex REGEX     Custom regex for label parsing
+  --atlas-name NAME        Custom atlas name for output files
+  --expected-rois N        Expected number of ROIs for validation
+  --output-dir DIR         Output directory (default: /scratch/xxqian/OCD/ROI_1stLevel)
+  --work-dir DIR           Work directory (default: /scratch/xxqian/OCD/work)
+  --bids-dir DIR           BIDS directory (default: /scratch/xxqian/OCD)
+  --roi-dir DIR            ROI directory (default: /scratch/xxqian/OCD/roi)
+  --time TIME              SLURM time limit (default: 2:00:00)
+  --mem MEM                SLURM memory limit (default: 16G)
+  --cpus CPUS              SLURM CPUs per task (default: 2)
+  --account ACCOUNT        SLURM account (default: xxqian)
+  --mail-type TYPE         SLURM mail type (default: END)
+  --mail-user USER         SLURM mail user (default: xxqian@stanford.edu)
+  --verbose                Enable verbose logging
+  --dry-run                Show what would be submitted without submitting
+
+EXAMPLES:
+  1. Submit all subjects with default settings:
+     bash submit_ROI_1st.sh
+
+  2. Submit specific subjects:
+     bash submit_ROI_1st.sh --subjects sub-AOCD001,sub-AOCD002
+
+  3. Submit with Schaefer 2018 atlas:
+     bash submit_ROI_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 400}'
+
+  4. Submit with custom atlas:
+     bash submit_ROI_1st.sh --atlas /path/to/atlas.nii.gz --labels /path/to/labels.txt
+
+  5. Submit with custom output directory:
+     bash submit_ROI_1st.sh --output-dir /custom/output/path
+
+  6. Submit with custom SLURM parameters:
+     bash submit_ROI_1st.sh --time 4:00:00 --mem 32G --cpus 4
+
+  7. Submit with verbose logging:
+     bash submit_ROI_1st.sh --verbose
+
+  8. Dry run to see what would be submitted:
+     bash submit_ROI_1st.sh --dry-run
+
+REQUIRED FILES:
+---------------
+- BIDS directory with fMRI data
+- ROI directory with atlas files
+- Container image (OCD.sif)
+- Python script (ROI_1st.py)
+
+OUTPUT:
+-------
+- Individual subject ROI-to-ROI FC matrices
+- Pairwise connectivity files
+- Correlation matrices
+
+For more information, run with --usage.
+EOF
 }
 
-log_info() {
-    log_message "INFO" "$@"
+print_usage() {
+    cat << 'EOF'
+DETAILED USAGE EXAMPLES
+=======================
+
+1. DEFAULT ANALYSIS (Harvard-Oxford Atlas)
+   ----------------------------------------
+   Submit all subjects using the default Harvard-Oxford cortical atlas:
+   
+   bash submit_ROI_1st.sh
+   
+   This will:
+   - Process all subjects in the BIDS directory
+   - Use Harvard-Oxford cortical atlas
+   - Submit jobs with 2:00:00 time limit and 16G memory
+   - Save results to /scratch/xxqian/OCD/ROI_1stLevel
+
+2. SPECIFIC SUBJECTS
+   ------------------
+   Submit only specific subjects:
+   
+   bash submit_ROI_1st.sh --subjects sub-AOCD001,sub-AOCD002,sub-AOCD003
+   
+   This is useful for:
+   - Testing the pipeline on a few subjects
+   - Re-processing failed subjects
+   - Processing new subjects incrementally
+
+3. NILEARN BUILT-IN ATLASES
+   -------------------------
+   Submit using Nilearn's built-in atlases:
+   
+   # Schaefer 2018 (400 ROIs, 7 networks)
+   bash submit_ROI_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 400, "yeo_networks": 7}'
+   
+   # Harvard-Oxford (cortical regions)
+   bash submit_ROI_1st.sh --atlas harvard_oxford --atlas-params '{"atlas_name": "cort-maxprob-thr25-2mm"}'
+   
+   # AAL atlas
+   bash submit_ROI_1st.sh --atlas aal
+
+4. CUSTOM ATLAS FILES
+   -------------------
+   Submit using custom atlas files:
+   
+   bash submit_ROI_1st.sh \
+     --atlas /path/to/custom_atlas.nii.gz \
+     --labels /path/to/custom_labels.txt \
+     --label-pattern simple \
+     --atlas-name custom_atlas
+
+5. CUSTOM OUTPUT PATHS
+   --------------------
+   Submit with custom output and work directories:
+   
+   bash submit_ROI_1st.sh \
+     --output-dir /scratch/user/custom_output \
+     --work-dir /scratch/user/custom_work \
+     --bids-dir /scratch/user/custom_bids
+
+6. CUSTOM SLURM PARAMETERS
+   -------------------------
+   Submit with custom resource allocation:
+   
+   bash submit_ROI_1st.sh \
+     --time 4:00:00 \
+     --mem 32G \
+     --cpus 4 \
+     --account custom_account
+
+7. VERBOSE LOGGING
+   ----------------
+   Submit with detailed logging for debugging:
+   
+   bash submit_ROI_1st.sh --verbose
+   
+   This enables:
+   - Detailed SLURM job information
+   - Python script verbose logging
+   - More informative error messages
+
+8. DRY RUN
+   ---------
+   See what would be submitted without actually submitting:
+   
+   bash submit_ROI_1st.sh --dry-run
+   
+   This shows:
+   - Which subjects would be processed
+   - What SLURM parameters would be used
+   - What commands would be executed
+
+ATLAS TYPES AND PARAMETERS:
+---------------------------
+Built-in Nilearn Atlases:
+- harvard_oxford: Harvard-Oxford cortical/subcortical atlases
+- schaefer_2018: Schaefer 2018 parcellation (100-1000 ROIs, 7/17 networks)
+- power_2011: Power 2011 atlas (264 ROIs, 13 networks)
+- aal: Automated Anatomical Labeling atlas (116 ROIs)
+- talairach: Talairach atlas (1107 ROIs)
+- yeo_2011: Yeo 2011 network parcellation (7/17 networks)
+
+Custom Atlases:
+- File-based: Provide path to .nii.gz file and labels file
+- Label patterns: simple, power, harvard_oxford, custom
+
+SLURM RESOURCE RECOMMENDATIONS:
+-------------------------------
+- Small datasets (< 100 subjects): 2:00:00, 16G, 2 CPUs
+- Medium datasets (100-500 subjects): 4:00:00, 32G, 4 CPUs
+- Large datasets (> 500 subjects): 8:00:00, 64G, 8 CPUs
+
+TROUBLESHOOTING:
+----------------
+1. Check that BIDS directory contains valid fMRI data
+2. Verify ROI directory has required atlas files
+3. Ensure container image exists and is accessible
+4. Check SLURM account and partition access
+5. Use --verbose for detailed error information
+6. Use --dry-run to verify configuration before submission
+
+For more information, see the script help or run with --help.
+EOF
 }
 
-log_warning() {
-    log_message "WARNING" "$@"
-}
+print_quick_help() {
+    cat << 'EOF'
+QUICK HELP - SLURM Job Submission for ROI_1st.py
+=================================================
 
-log_error() {
-    log_message "ERROR" "$@"
-}
+BASIC USAGE:
+  bash submit_ROI_1st.sh [OPTIONS]
 
-log_success() {
-    log_message "SUCCESS" "$@"
-}
+QUICK EXAMPLES:
+  1. Default (Harvard-Oxford Atlas):
+     bash submit_ROI_1st.sh
 
-check_dependencies() {
-    log_info "Checking dependencies..."
-    
-    # Check if container exists
-    if [ ! -f "$CONTAINER" ]; then
-        log_error "Apptainer container not found: $CONTAINER"
-        return 1
-    fi
-    
-    # Check if script exists
-    if [ ! -f "$SCRIPT_PATH" ]; then
-        log_error "ROI_1st.py script not found: $SCRIPT_PATH"
-        return 1
-    fi
-    
-    # Check if required directories exist
-    local required_dirs=("$BIDS_DIR" "/scratch/xxqian" "/project/6079231/dliang55/R01_AOCD")
-    for dir in "${required_dirs[@]}"; do
-        if [ ! -e "$dir" ]; then
-            log_error "Required directory does not exist: $dir"
-            return 1
-        fi
-    done
-    
-    log_success "All dependencies verified"
-    return 0
-}
+  2. Specific Subjects:
+     bash submit_ROI_1st.sh --subjects sub-AOCD001,sub-AOCD002
 
-create_directories() {
-    log_info "Creating necessary directories..."
-    
-    local dirs=("$OUTPUT_DIR" "$LOG_DIR" "$TEMP_JOB_DIR" "$WORK_DIR")
-    for dir in "${dirs[@]}"; do
-        if [ ! -d "$dir" ]; then
-            mkdir -p "$dir"
-            log_info "Created directory: $dir"
-        else
-            log_info "Directory already exists: $dir"
-        fi
-    done
-}
+  3. Schaefer 2018 Atlas:
+     bash submit_ROI_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 400}'
 
-get_subjects() {
-    log_info "Scanning for subjects in BIDS directory..."
-    
-    if [ ! -d "$BIDS_DIR" ]; then
-        log_error "BIDS directory does not exist: $BIDS_DIR"
-        return 1
-    fi
-    
-    # Find all subject directories
-    local subjects=()
-    while IFS= read -r -d '' subject; do
-        if [ -d "$subject" ]; then
-            subjects+=("$(basename "$subject")")
-        fi
-    done < <(find "$BIDS_DIR" -maxdepth 1 -type d -name "sub-*" -print0)
-    
-    if [ ${#subjects[@]} -eq 0 ]; then
-        log_error "No subjects found in BIDS directory: $BIDS_DIR"
-        return 1
-    fi
-    
-    log_success "Found ${#subjects[@]} subjects: ${subjects[*]}"
-    printf '%s\n' "${subjects[@]}"
-}
+  4. Custom Atlas:
+     bash submit_ROI_1st.sh --atlas /path/to/atlas.nii.gz --labels /path/to/labels.txt
 
-generate_job_script() {
-    local subject="$1"
-    local job_name="$2"
-    local job_script="$3"
-    
-    log_info "Generating SLURM job script for $subject..."
-    
-    # Extract subject ID without 'sub-' prefix
-    local subject_id="${subject#sub-}"
-    
-    # Create SLURM job script
-    cat > "$job_script" << EOF
-#!/bin/bash
-#SBATCH --job-name=${job_name}
-#SBATCH --output=${LOG_DIR}/${job_name}_%j.out
-#SBATCH --error=${LOG_DIR}/${job_name}_%j.err
-$(printf '%s\n' "${SLURM_CONFIG[@]}")
-#SBATCH --workdir=${WORK_DIR}
+HELP OPTIONS:
+  --help          Show full help with all arguments
+  --usage         Show detailed usage examples
+
+For more information, run with --usage or --help.
+EOF
+}
 
 # =============================================================================
-# ROI-to-ROI Functional Connectivity Analysis Job
-# =============================================================================
-# Job Information:
-#   Subject: ${subject} (${subject_id})
-#   Script: ROI_1st.py
-#   Atlas: Harvard-Oxford Cortical Atlas
-#   Analysis: ROI-to-ROI Functional Connectivity
+# ARGUMENT PARSING
 # =============================================================================
 
-echo "Starting ROI-to-ROI FC analysis for ${subject} at \$(date)"
-echo "Job ID: \$SLURM_JOB_ID"
-echo "Node: \$SLURM_NODELIST"
-echo "Working directory: \$SLURM_SUBMIT_DIR"
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --help|-h|help)
+            print_help
+            exit 0
+            ;;
+        --usage)
+            print_usage
+            exit 0
+            ;;
+        --subjects)
+            SUBJECTS="$2"
+            shift 2
+            ;;
+        --atlas)
+            ATLAS="$2"
+            shift 2
+            ;;
+        --atlas-params)
+            ATLAS_PARAMS="$2"
+            shift 2
+            ;;
+        --labels)
+            LABELS="$2"
+            shift 2
+            ;;
+        --label-pattern)
+            LABEL_PATTERN="$2"
+            shift 2
+            ;;
+        --custom-regex)
+            CUSTOM_REGEX="$2"
+            shift 2
+            ;;
+        --atlas-name)
+            ATLAS_NAME="$2"
+            shift 2
+            ;;
+        --expected-rois)
+            EXPECTED_ROIS="$2"
+            shift 2
+            ;;
+        --output-dir)
+            OUTPUT_DIR="$2"
+            shift 2
+            ;;
+        --work-dir)
+            WORK_DIR="$2"
+            shift 2
+            ;;
+        --bids-dir)
+            BIDS_DIR="$2"
+            shift 2
+            ;;
+        --roi-dir)
+            ROI_DIR="$2"
+            shift 2
+            ;;
+        --time)
+            SLURM_TIME="$2"
+            shift 2
+            ;;
+        --mem)
+            SLURM_MEM="$2"
+            shift 2
+            ;;
+        --cpus)
+            SLURM_CPUS="$2"
+            shift 2
+            ;;
+        --account)
+            SLURM_ACCOUNT="$2"
+            shift 2
+            ;;
+        --mail-type)
+            SLURM_MAIL_TYPE="$2"
+            shift 2
+            ;;
+        --mail-user)
+            SLURM_MAIL_USER="$2"
+            shift 2
+            ;;
+        --verbose)
+            VERBOSE="--verbose"
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Run with --help for usage information"
+            exit 1
+            ;;
+    esac
+done
 
-# Load required modules
-module load apptainer
+# Set default values for unset variables
+: ${SUBJECTS:=""}
+: ${ATLAS:="$DEFAULT_ATLAS"}
+: ${ATLAS_PARAMS:=""}
+: ${LABELS:="$DEFAULT_LABELS"}
+: ${LABEL_PATTERN:="$DEFAULT_LABEL_PATTERN"}
+: ${CUSTOM_REGEX:=""}
+: ${ATLAS_NAME:=""}
+: ${EXPECTED_ROIS:=""}
+: ${DRY_RUN:=false}
 
-# Set up environment
-export OMP_NUM_THREADS=\$SLURM_CPUS_PER_TASK
-export MKL_NUM_THREADS=\$SLURM_CPUS_PER_TASK
+# =============================================================================
+# VALIDATION AND SETUP
+# =============================================================================
 
-# Create subject-specific work directory
-SUBJECT_WORK_DIR="${WORK_DIR}/${subject_id}"
-mkdir -p "\$SUBJECT_WORK_DIR"
-
-# Define Apptainer bind paths
-# Map host paths to container paths for proper file access
-BIND_PATHS=(
-    "${SCRIPT_PATH}:/app/ROI_1st.py"
-    "${BIDS_DIR}:/project"
-    "${OUTPUT_DIR}:/output"
-    "\$SUBJECT_WORK_DIR:/work"
-    "/scratch/xxqian:/scratch"
-)
-
-# Convert bind paths array to comma-separated string
-BIND_STRING=\$(IFS=','; echo "\${BIND_PATHS[*]}")
-
-# Run the analysis
-echo "Executing ROI_1st.py for ${subject}..."
-apptainer exec \\
-    --bind "\$BIND_STRING" \\
-    "${CONTAINER}" \\
-    python3 /app/ROI_1st.py \\
-        --subject ${subject} \\
-        --output_dir /output \\
-        --work_dir /work \\
-        --verbose
-
-# Check exit status
-if [ \$? -eq 0 ]; then
-    echo "ROI-to-ROI FC analysis completed successfully for ${subject} at \$(date)"
-    
-    # List generated output files
-    echo "Generated output files:"
-    ls -la /output/*${subject}* 2>/dev/null || echo "No output files found"
-    
-    # Clean up temporary files
-    echo "Cleaning up temporary files..."
-    rm -rf /work/*
-    
-else
-    echo "ROI-to-ROI FC analysis failed for ${subject} at \$(date)" >&2
+# Validate required directories
+if [[ ! -d "$BIDS_DIR" ]]; then
+    echo "Error: BIDS directory does not exist: $BIDS_DIR"
     exit 1
 fi
 
-echo "Job completed at \$(date)"
+if [[ ! -d "$ROI_DIR" ]]; then
+    echo "Error: ROI directory does not exist: $ROI_DIR"
+    exit 1
+fi
+
+if [[ ! -f "$CONTAINER" ]]; then
+    echo "Error: Container image does not exist: $CONTAINER"
+    exit 1
+fi
+
+if [[ ! -f "$PYTHON_SCRIPT" ]]; then
+    echo "Error: Python script does not exist: $PYTHON_SCRIPT"
+    exit 1
+fi
+
+# Create output and work directories
+mkdir -p "$OUTPUT_DIR"
+mkdir -p "$WORK_DIR"
+
+# =============================================================================
+# SUBJECT DISCOVERY
+# =============================================================================
+
+# Get list of subjects
+if [[ -z "$SUBJECTS" ]]; then
+    echo "Discovering subjects in BIDS directory: $BIDS_DIR"
+    SUBJECTS=$(find "$BIDS_DIR" -maxdepth 1 -type d -name "sub-*" | sort | xargs -n 1 basename | tr '\n' ',' | sed 's/,$//')
+    if [[ -z "$SUBJECTS" ]]; then
+        echo "Error: No subjects found in BIDS directory: $BIDS_DIR"
+        exit 1
+    fi
+    echo "Found subjects: $SUBJECTS"
+fi
+
+# Convert comma-separated list to array
+IFS=',' read -ra SUBJECT_ARRAY <<< "$SUBJECTS"
+
+# =============================================================================
+# JOB SUBMISSION
+# =============================================================================
+
+echo "=" * 80
+echo "Submitting ROI_1st.py jobs to SLURM"
+echo "=" * 80
+echo "BIDS Directory: $BIDS_DIR"
+echo "Output Directory: $OUTPUT_DIR"
+echo "Work Directory: $WORK_DIR"
+echo "ROI Directory: $ROI_DIR"
+echo "Atlas: $ATLAS"
+if [[ -n "$ATLAS_PARAMS" ]]; then
+    echo "Atlas Parameters: $ATLAS_PARAMS"
+fi
+if [[ -n "$LABELS" ]]; then
+    echo "Labels: $LABELS"
+fi
+echo "Label Pattern: $LABEL_PATTERN"
+if [[ -n "$CUSTOM_REGEX" ]]; then
+    echo "Custom Regex: $CUSTOM_REGEX"
+fi
+if [[ -n "$ATLAS_NAME" ]]; then
+    echo "Atlas Name: $ATLAS_NAME"
+fi
+if [[ -n "$EXPECTED_ROIS" ]]; then
+    echo "Expected ROIs: $EXPECTED_ROIS"
+fi
+echo "SLURM Time: $SLURM_TIME"
+echo "SLURM Memory: $SLURM_MEM"
+echo "SLURM CPUs: $SLURM_CPUS"
+echo "Subjects: $SUBJECTS"
+echo "=" * 80
+
+# Submit jobs for each subject
+for subject in "${SUBJECT_ARRAY[@]}"; do
+    echo "Processing subject: $subject"
+    
+    # Create subject-specific work directory
+    subject_work_dir="$WORK_DIR/$subject"
+    mkdir -p "$subject_work_dir"
+    
+    # Build Python command
+    python_cmd="python $PYTHON_SCRIPT --subject $subject --atlas $ATLAS --label-pattern $LABEL_PATTERN"
+    
+    if [[ -n "$ATLAS_PARAMS" ]]; then
+        python_cmd="$python_cmd --atlas-params '$ATLAS_PARAMS'"
+    fi
+    
+    if [[ -n "$LABELS" ]]; then
+        python_cmd="$python_cmd --labels $LABELS"
+    fi
+    
+    if [[ -n "$CUSTOM_REGEX" ]]; then
+        python_cmd="$python_cmd --custom-regex '$CUSTOM_REGEX'"
+    fi
+    
+    if [[ -n "$ATLAS_NAME" ]]; then
+        python_cmd="$python_cmd --atlas-name $ATLAS_NAME"
+    fi
+    
+    if [[ -n "$EXPECTED_ROIS" ]]; then
+        python_cmd="$python_cmd --expected-rois $EXPECTED_ROIS"
+    fi
+    
+    if [[ -n "$VERBOSE" ]]; then
+        python_cmd="$python_cmd $VERBOSE"
+    fi
+    
+    # Create SLURM job script
+    job_script="$subject_work_dir/submit_${subject}.sh"
+    
+    cat > "$job_script" << EOF
+#!/bin/bash
+#SBATCH --job-name=ROI_1st_${subject}
+#SBATCH --output=${subject_work_dir}/%j.out
+#SBATCH --error=${subject_work_dir}/%j.err
+#SBATCH --time=${SLURM_TIME}
+#SBATCH --mem=${SLURM_MEM}
+#SBATCH --cpus-per-task=${SLURM_CPUS}
+#SBATCH --account=${SLURM_ACCOUNT}
+#SBATCH --mail-type=${SLURM_MAIL_TYPE}
+#SBATCH --mail-user=${SLURM_MAIL_USER}
+
+# Job information
+echo "Job started at: \$(date)"
+echo "Job ID: \$SLURM_JOB_ID"
+echo "Node: \$SLURM_NODELIST"
+echo "Subject: $subject"
+echo "Working directory: \$SLURM_SUBMIT_DIR"
+
+# Load modules (if needed)
+# module load fsl
+
+# Run the analysis
+echo "Starting ROI_1st.py analysis for $subject"
+apptainer exec \\
+  --bind $BIDS_DIR:/input \\
+  --bind $OUTPUT_DIR:/output \\
+  --bind $subject_work_dir:/work \\
+  --bind $ROI_DIR:/roi \\
+  --bind \$(pwd):/scripts \\
+  $CONTAINER \\
+  $python_cmd
+
+# Check exit status
+exit_code=\$?
+if [[ \$exit_code -eq 0 ]]; then
+    echo "Job completed successfully at: \$(date)"
+else
+    echo "Job failed with exit code \$exit_code at: \$(date)"
+fi
+
+exit \$exit_code
 EOF
 
-    log_success "Generated job script: $job_script"
-}
-
-submit_job() {
-    local job_script="$1"
-    local subject="$2"
+    # Make job script executable
+    chmod +x "$job_script"
     
-    log_info "Submitting SLURM job for $subject..."
-    
-    # Submit the job
-    local job_id
-    job_id=$(sbatch "$job_script" | awk '{print $4}')
-    
-    if [ -n "$job_id" ]; then
-        log_success "Submitted job for $subject (Job ID: $job_id)"
-        return 0
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "DRY RUN: Would submit job for $subject"
+        echo "Job script: $job_script"
+        echo "Python command: $python_cmd"
+        echo "---"
     else
-        log_error "Failed to submit job for $subject"
-        return 1
-    fi
-}
-
-cleanup_job_scripts() {
-    log_info "Cleaning up temporary job scripts..."
-    
-    if [ -d "$TEMP_JOB_DIR" ]; then
-        rm -rf "$TEMP_JOB_DIR"/*
-        log_info "Cleaned up temporary job scripts"
-    fi
-}
-
-# =============================================================================
-# MAIN EXECUTION
-# =============================================================================
-
-main() {
-    log_info "Starting ROI-to-ROI FC job submission process..."
-    log_info "Container: $CONTAINER"
-    log_info "Script: $SCRIPT_PATH"
-    log_info "BIDS directory: $BIDS_DIR"
-    log_info "Output directory: $OUTPUT_DIR"
-    
-    # Check dependencies
-    if ! check_dependencies; then
-        log_error "Dependency check failed. Exiting."
-        exit 1
-    fi
-    
-    # Create necessary directories
-    create_directories
-    
-    # Get list of subjects
-    local subjects
-    subjects=$(get_subjects)
-    if [ $? -ne 0 ]; then
-        log_error "Failed to get subjects. Exiting."
-        exit 1
-    fi
-    
-    # Process each subject
-    local total_subjects=0
-    local submitted_jobs=0
-    local failed_jobs=0
-    
-    while IFS= read -r subject; do
-        [ -z "$subject" ] && continue
+        # Submit job to SLURM
+        echo "Submitting job for $subject..."
+        job_id=$(sbatch "$job_script" | awk '{print $4}')
+        echo "Submitted job ID: $job_id for $subject"
         
-        total_subjects=$((total_subjects + 1))
-        log_info "Processing subject $total_subjects: $subject"
-        
-        # Generate job name and script path
-        local job_name="ROI_1st_${subject}"
-        local job_script="$TEMP_JOB_DIR/${job_name}.slurm"
-        
-        # Generate job script
-        if generate_job_script "$subject" "$job_name" "$job_script"; then
-            # Submit job
-            if submit_job "$job_script" "$subject"; then
-                submitted_jobs=$((submitted_jobs + 1))
-            else
-                failed_jobs=$((failed_jobs + 1))
-            fi
-        else
-            log_error "Failed to generate job script for $subject"
-            failed_jobs=$((failed_jobs + 1))
-        fi
-        
-        # Small delay between submissions
+        # Wait a moment between submissions to avoid overwhelming the scheduler
         sleep 1
-        
-    done <<< "$subjects"
-    
-    # Summary
-    log_info "Job submission process completed"
-    log_info "Total subjects: $total_subjects"
-    log_info "Successfully submitted: $submitted_jobs"
-    log_info "Failed: $failed_jobs"
-    
-    if [ $submitted_jobs -gt 0 ]; then
-        log_success "Submitted $submitted_jobs jobs successfully"
-        log_info "Check job status with: squeue -u $USER"
-        log_info "Monitor logs in: $LOG_DIR"
     fi
-    
-    if [ $failed_jobs -gt 0 ]; then
-        log_warning "$failed_jobs jobs failed to submit"
-        exit 1
-    fi
-}
+done
 
-# =============================================================================
-# SCRIPT EXECUTION
-# =============================================================================
-
-# Set up error handling
-trap 'log_error "Script interrupted. Cleaning up..."; cleanup_job_scripts; exit 1' INT TERM
-
-# Run main function
-if main; then
-    log_success "ROI-to-ROI FC job submission completed successfully"
-    exit 0
+if [[ "$DRY_RUN" == true ]]; then
+    echo "DRY RUN COMPLETED"
+    echo "No jobs were actually submitted to SLURM"
+    echo "Review the configuration above and run without --dry-run to submit jobs"
 else
-    log_error "ROI-to-ROI FC job submission failed"
-    exit 1
+    echo "=" * 80
+    echo "Job submission completed"
+    echo "=" * 80
+    echo "Submitted $((${#SUBJECT_ARRAY[@]})) jobs to SLURM"
+    echo "Check job status with: squeue -u $USER"
+    echo "Monitor jobs with: watch -n 10 'squeue -u $USER'"
+    echo "Check logs in: $WORK_DIR/*/slurm-*.out"
 fi
