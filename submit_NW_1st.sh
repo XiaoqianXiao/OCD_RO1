@@ -653,11 +653,27 @@ fi
 # Get list of subjects
 if [[ -z "$SUBJECTS" ]]; then
     echo "Discovering subjects in BIDS directory: $BIDS_DIR"
-    SUBJECTS=$(find "$BIDS_DIR" -maxdepth 1 -type d -name "sub-*" | sort | xargs -n 1 basename | tr '\n' ',' | sed 's/,$//')
-    if [[ -z "$SUBJECTS" ]]; then
+    
+    # Find subjects and check if any were found
+    local found_subjects=$(find "$BIDS_DIR" -maxdepth 1 -type d -name "sub-*" 2>/dev/null | sort)
+    
+    if [[ -z "$found_subjects" ]]; then
         echo "Error: No subjects found in BIDS directory: $BIDS_DIR"
+        echo "Please check that:"
+        echo "  1. The BIDS directory exists and is accessible"
+        echo "  2. The directory contains sub-* folders"
+        echo "  3. You have read permissions for the directory"
         exit 1
     fi
+    
+    # Convert to comma-separated list
+    SUBJECTS=$(echo "$found_subjects" | xargs -n 1 basename | tr '\n' ',' | sed 's/,$//')
+    
+    if [[ -z "$SUBJECTS" ]]; then
+        echo "Error: Failed to process subject names from: $found_subjects"
+        exit 1
+    fi
+    
     echo "Found subjects: $SUBJECTS"
 fi
 
