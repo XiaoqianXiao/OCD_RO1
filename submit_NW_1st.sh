@@ -73,6 +73,18 @@ PYTHON_SCRIPT="NW_1st.py"
 # HELPER FUNCTIONS
 # =============================================================================
 
+# Safe SLURM environment variable access
+get_slurm_var() {
+    local var_name="$1"
+    local fallback="$2"
+    
+    if [[ -n "${!var_name:-}" ]]; then
+        echo "${!var_name}"
+    else
+        echo "$fallback"
+    fi
+}
+
 check_slurm_issues() {
     local subject="$1"
     local job_script="$2"
@@ -81,23 +93,35 @@ check_slurm_issues() {
     
     # Check SLURM daemon status
     echo "Checking SLURM daemon status..."
-    if ! squeue -u $USER >/dev/null 2>&1; then
-        echo "ERROR: Cannot connect to SLURM daemon. SLURM may be down or you may not have access."
-        return 1
+    if [[ "$SQUEUE_AVAILABLE" == true ]]; then
+        if ! squeue -u $USER >/dev/null 2>&1; then
+            echo "ERROR: Cannot connect to SLURM daemon. SLURM may be down or you may not have access."
+            return 1
+        fi
+    else
+        echo "Skipping SLURM daemon check (squeue not available)"
     fi
     
     # Check partition availability
     echo "Checking partition availability..."
-    if ! sinfo >/dev/null 2>&1; then
-        echo "ERROR: Cannot get partition information. SLURM may be down or you may not have access."
-        return 1
+    if [[ "$SBATCH_AVAILABLE" == true ]]; then
+        if ! sinfo >/dev/null 2>&1; then
+            echo "ERROR: Cannot get partition information. SLURM may be down or you may not have access."
+            return 1
+        fi
+    else
+        echo "Skipping partition check (sinfo not available)"
     fi
     
     # Check account access
     if [[ -n "$SLURM_ACCOUNT" ]]; then
         echo "Checking account access for: $SLURM_ACCOUNT"
-        if ! sacctmgr show account $SLURM_ACCOUNT >/dev/null 2>&1; then
-            echo "WARNING: Cannot verify account $SLURM_ACCOUNT. You may not have access or the account may not exist."
+        if [[ "$SBATCH_AVAILABLE" == true ]]; then
+            if ! sacctmgr show account $SLURM_ACCOUNT >/dev/null 2>&1; then
+                echo "WARNING: Cannot verify account $SLURM_ACCOUNT. You may not have access or the account may not exist."
+            fi
+        else
+            echo "Skipping account verification (sacctmgr not available)"
         fi
     fi
     
@@ -114,8 +138,12 @@ check_slurm_issues() {
     fi
     
     # Check if user has pending jobs
-    local pending_jobs=$(squeue -u $USER -h | wc -l)
-    echo "Current pending jobs for user $USER: $pending_jobs"
+    if [[ "$SQUEUE_AVAILABLE" == true ]]; then
+        local pending_jobs=$(squeue -u $USER -h 2>/dev/null | wc -l)
+        echo "Current pending jobs for user $USER: $pending_jobs"
+    else
+        echo "Skipping pending jobs check (squeue not available)"
+    fi
     
     # Check job script syntax
     echo "Checking job script syntax..."
@@ -548,10 +576,12 @@ done
 
 # Check SLURM environment
 echo "Checking SLURM environment..."
-if [[ -n "$SLURM_JOB_ID" ]]; then
+if [[ -n "${SLURM_JOB_ID:-}" ]]; then
     echo "Running inside SLURM job: $SLURM_JOB_ID"
+    SLURM_MODE=true
 else
     echo "Running outside SLURM (interactive mode)"
+    SLURM_MODE=false
 fi
 
 # Check SLURM commands availability
@@ -559,15 +589,24 @@ echo "Checking SLURM commands..."
 if command -v sbatch >/dev/null 2>&1; then
     echo "sbatch command available: $(which sbatch)"
     sbatch --version 2>/dev/null | head -1 || echo "Could not get sbatch version"
+    SBATCH_AVAILABLE=true
 else
     echo "ERROR: sbatch command not found"
-    exit 1
+    if [[ "$SLURM_MODE" == true ]]; then
+        echo "Cannot run SLURM job submission without sbatch command"
+        exit 1
+    else
+        echo "WARNING: sbatch not available - will only perform validation checks"
+        SBATCH_AVAILABLE=false
+    fi
 fi
 
 if command -v squeue >/dev/null 2>&1; then
     echo "squeue command available: $(which squeue)"
+    SQUEUE_AVAILABLE=true
 else
     echo "WARNING: squeue command not found"
+    SQUEUE_AVAILABLE=false
 fi
 
 # Validate required directories
@@ -600,13 +639,21 @@ echo "Checking SLURM account access..."
 if [[ -n "$SLURM_ACCOUNT" ]]; then
     echo "SLURM account: $SLURM_ACCOUNT"
     # Try to check account status (this might fail on some systems)
-    sacctmgr show account $SLURM_ACCOUNT 2>/dev/null | head -5 || echo "Could not check account status"
+    if [[ "$SBATCH_AVAILABLE" == true ]]; then
+        sacctmgr show account $SLURM_ACCOUNT 2>/dev/null | head -5 || echo "Could not check account status"
+    else
+        echo "Skipping account check (sbatch not available)"
+    fi
 else
     echo "WARNING: No SLURM account specified"
 fi
 
 echo "Checking available partitions..."
-sinfo -o "%20P %5D %14F" 2>/dev/null | head -10 || echo "Could not check partition status"
+if [[ "$SBATCH_AVAILABLE" == true ]]; then
+    sinfo -o "%20P %5D %14F" 2>/dev/null | head -10 || echo "Could not check partition status"
+else
+    echo "Skipping partition check (sbatch not available)"
+fi
 
 # =============================================================================
 # SUBJECT DISCOVERY
@@ -757,14 +804,26 @@ EOF
         fi
 
         # Validate SLURM environment
-        if ! check_slurm_issues "$subject" "$job_script"; then
-            echo "Skipping job for $subject due to SLURM environment issues."
-            ((SKIPPED_SUBMISSIONS++))
-            continue
+        if [[ "$SBATCH_AVAILABLE" == true ]]; then
+            if ! check_slurm_issues "$subject" "$job_script"; then
+                echo "Skipping job for $subject due to SLURM environment issues."
+                ((SKIPPED_SUBMISSIONS++))
+                continue
+            fi
+        else
+            echo "Skipping SLURM environment check (sbatch not available)"
         fi
 
         # Submit job to SLURM
         echo "Submitting job for $subject..."
+        
+        if [[ "$SBATCH_AVAILABLE" == false ]]; then
+            echo "ERROR: Cannot submit job - sbatch command not available"
+            echo "This script requires SLURM to be installed and accessible"
+            echo "You can use --dry-run to validate the configuration without submitting jobs"
+            ((FAILED_SUBMISSIONS++))
+            continue
+        fi
         
         # Submit the job and capture output
         sbatch_output=$(sbatch "$job_script" 2>&1)
