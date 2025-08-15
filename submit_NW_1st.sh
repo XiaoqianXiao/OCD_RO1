@@ -45,29 +45,7 @@ set -euo pipefail
 # CONFIGURATION
 # =============================================================================
 
-# Default directories
-BIDS_DIR="/scratch/xxqian/OCD"
-OUTPUT_DIR="/scratch/xxqian/OCD/NW_1stLevel"
-WORK_DIR="/scratch/xxqian/OCD/work"
-ROI_DIR="/scratch/xxqian/OCD/roi"
 
-# Default SLURM parameters
-SLURM_TIME="2:00:00"
-SLURM_MEM="16G"
-SLURM_CPUS="2"
-SLURM_ACCOUNT="xxqian"
-SLURM_MAIL_TYPE="END"
-SLURM_MAIL_USER="xxqian@stanford.edu"
-
-# Default analysis parameters
-DEFAULT_ATLAS="power_2011"
-DEFAULT_LABEL_PATTERN="power"
-DEFAULT_LABELS="/scratch/xxqian/OCD/roi/power264/power264NodeNames.txt"
-VERBOSE=""
-
-# Container and Python script
-CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
-PYTHON_SCRIPT="NW_1st.py"
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -226,7 +204,7 @@ OPTIONS:
   --output-dir DIR         Output directory (default: /scratch/xxqian/OCD/NW_1stLevel)
   --work-dir DIR           Work directory (default: /scratch/xxqian/OCD/work)
   --bids-dir DIR           BIDS directory (default: /scratch/xxqian/OCD)
-  --roi-dir DIR            ROI directory (default: /scratch/xxqian/OCD/roi)
+          --roi-dir DIR            ROI directory (default: /scratch/xxqian/roi)
   --time TIME              SLURM time limit (default: 2:00:00)
   --mem MEM                SLURM memory limit (default: 16G)
   --cpus CPUS              SLURM CPUs per task (default: 2)
@@ -560,15 +538,28 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Set default values for unset variables
-: ${SUBJECTS:=""}
-: ${ATLAS:="$DEFAULT_ATLAS"}
-: ${ATLAS_PARAMS:=""}
-: ${LABELS:="$DEFAULT_LABELS"}
-: ${LABEL_PATTERN:="$DEFAULT_LABEL_PATTERN"}
-: ${CUSTOM_REGEX:=""}
-: ${ATLAS_NAME:=""}
-: ${DRY_RUN:=false}
+# Initialize variables with defaults
+BIDS_DIR="/scratch/xxqian/OCD"
+OUTPUT_DIR="/scratch/xxqian/OCD/results"
+WORK_DIR="/scratch/xxqian/OCD/work"
+ROI_DIR="/scratch/xxqian/roi"
+CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
+PYTHON_SCRIPT="NW_1st.py"
+SLURM_TIME="4:00:00"
+SLURM_MEM="16G"
+SLURM_CPUS="2"
+SLURM_ACCOUNT="xxqian"
+SLURM_MAIL_TYPE="END"
+SLURM_MAIL_USER="xxqian@stanford.edu"
+ATLAS="power_2011"
+LABELS=""
+LABEL_PATTERN="power"
+ATLAS_PARAMS=""
+CUSTOM_REGEX=""
+ATLAS_NAME=""
+SUBJECTS=""
+VERBOSE=""
+DRY_RUN=false
 
 # =============================================================================
 # VALIDATION AND SETUP
