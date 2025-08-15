@@ -756,7 +756,7 @@ for subject in "${SUBJECT_ARRAY[@]}"; do
     fi
     
     # Create SLURM job script
-    job_script="$SLURM_SCRIPTS_DIR/submit_${subject}.sh"
+    job_script="$SLURM_SCRIPTS_DIR/NW_1st_${subject}.slurm"
     
     cat > "$job_script" << EOF
 #!/bin/bash
