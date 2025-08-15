@@ -541,6 +541,29 @@ DETAILED USAGE EXAMPLES
    - Network name generation
    - Configuration consistency
 
+9. FIXING NILEARN DATA DIRECTORY ISSUES
+   ------------------------------------
+   Fix common Nilearn data directory problems in containerized environments.
+   
+   python NW_1st.py --fix-nilearn-data
+   
+   This will:
+   - Clear corrupted data directories
+   - Set proper environment variables
+   - Create clean data storage locations
+
+10. PRE-DOWNLOADING SCHAEFER 2018 ATLAS
+    ------------------------------------
+    Pre-download and cache common Schaefer 2018 configurations.
+    
+    python NW_1st.py --pre-download-schaefer
+    
+    This will download:
+    - 100 ROIs, 7 networks, 2mm
+    - 200 ROIs, 7 networks, 2mm
+    - 400 ROIs, 7 networks, 2mm
+    - 400 ROIs, 17 networks, 2mm
+
 NILEARN ATLAS PARAMETERS:
 -------------------------
 Schaefer 2018:
@@ -611,6 +634,12 @@ SCHAEFER 2018 SPECIFIC TROUBLESHOOTING:
    - The atlas will be downloaded automatically on first use
    - Ensure stable internet connection
    - Check available disk space for atlas storage
+
+5. Nilearn data directory issues (common in containers):
+   - Error: "File exists" or "nilearn_data" issues
+   - Solution: Run with --fix-nilearn-data option
+   - Alternative: Use --pre-download-schaefer to cache atlases
+   - Check container permissions and disk space
 """
     print(examples_text)
 
@@ -664,6 +693,37 @@ def test_schaefer_2018_configuration():
     print("\nSchaefer 2018 Atlas is properly configured! 🎉")
     return True
 
+def fix_nilearn_data_directory():
+    """Fix common Nilearn data directory issues in containerized environments."""
+    import tempfile
+    import shutil
+    
+    # Set Nilearn data directory to a writable location
+    nilearn_data_dir = os.path.join('/tmp', 'nilearn_data')
+    os.environ['NILEARN_DATA'] = nilearn_data_dir
+    
+    # Create clean data directory
+    if os.path.exists(nilearn_data_dir):
+        try:
+            shutil.rmtree(nilearn_data_dir)
+        except Exception:
+            pass
+    
+    os.makedirs(nilearn_data_dir, exist_ok=True)
+    
+    # Also try to clear the problematic home directory
+    home_nilearn_dir = '/home/xxqian/nilearn_data'
+    if os.path.exists(home_nilearn_dir):
+        try:
+            if os.path.isfile(home_nilearn_dir):
+                os.remove(home_nilearn_dir)
+            else:
+                shutil.rmtree(home_nilearn_dir)
+        except Exception:
+            pass
+    
+    return nilearn_data_dir
+
 def check_nilearn_compatibility():
     """Check Nilearn version compatibility and atlas availability."""
     try:
@@ -696,6 +756,43 @@ def check_nilearn_compatibility():
         print(f"❌ Error checking Nilearn compatibility: {e}")
         return False
 
+def pre_download_schaefer_2018_atlas():
+    """Pre-download and cache the Schaefer 2018 atlas to avoid download issues during analysis."""
+    print("Pre-downloading Schaefer 2018 atlas...")
+    
+    try:
+        # Fix data directory first
+        data_dir = fix_nilearn_data_directory()
+        print(f"✅ Using data directory: {data_dir}")
+        
+        # Try to download different configurations
+        configs = [
+            {'n_rois': 100, 'yeo_networks': 7, 'resolution_mm': 2},
+            {'n_rois': 200, 'yeo_networks': 7, 'resolution_mm': 2},
+            {'n_rois': 400, 'yeo_networks': 7, 'resolution_mm': 2},
+            {'n_rois': 400, 'yeo_networks': 17, 'resolution_mm': 2}
+        ]
+        
+        for config in configs:
+            try:
+                print(f"  Downloading: {config['n_rois']} ROIs, {config['yeo_networks']} networks, {config['resolution_mm']}mm...")
+                if 'fetch_atlas_schaefer_2018' in globals() and fetch_atlas_schaefer_2018 is not None:
+                    atlas_data = fetch_atlas_schaefer_2018(**config)
+                    print(f"    ✅ Successfully downloaded: {config}")
+                else:
+                    print(f"    ❌ Schaefer 2018 atlas function not available")
+                    break
+            except Exception as e:
+                print(f"    ❌ Failed to download {config}: {e}")
+                continue
+        
+        print("✅ Pre-download completed!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Pre-download failed: {e}")
+        return False
+
 # =============================================================================
 # USAGE AND HELP FUNCTIONS
 # =============================================================================
@@ -725,6 +822,30 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
         # Fetch the atlas
         try:
             atlas_data = fetch_func(**params)
+        except OSError as e:
+            error_msg = str(e)
+            if "File exists" in error_msg or "nilearn_data" in error_msg:
+                logger.warning("Detected Nilearn data directory issue, attempting to fix...")
+                try:
+                    fix_nilearn_data_directory()
+                    logger.info("Retrying atlas fetch after fixing data directory...")
+                    atlas_data = fetch_func(**params)
+                except Exception as retry_e:
+                    logger.error(f"Failed to fetch {atlas_name} atlas after fixing data directory: {str(retry_e)}")
+                    logger.error("This might be due to:")
+                    logger.error("1. Network connectivity issues")
+                    logger.error("2. Insufficient disk space")
+                    logger.error("3. Nilearn version compatibility")
+                    logger.error("4. Persistent data directory issues")
+                    logger.error("Try running with --fix-nilearn-data option")
+                    raise
+            else:
+                logger.error(f"Failed to fetch {atlas_name} atlas: {error_msg}")
+                logger.error("This might be due to:")
+                logger.error("1. Network connectivity issues")
+                logger.error("2. Insufficient disk space")
+                logger.error("3. Nilearn version compatibility")
+                raise
         except Exception as e:
             logger.error(f"Failed to fetch {atlas_name} atlas: {str(e)}")
             logger.error("This might be due to:")
@@ -1486,6 +1607,16 @@ Run with --usage for detailed examples or --help for full help.
         action='store_true',
         help='Check Nilearn version compatibility and atlas availability'
     )
+    parser.add_argument(
+        '--fix-nilearn-data',
+        action='store_true',
+        help='Fix Nilearn data directory issues (useful in containerized environments)'
+    )
+    parser.add_argument(
+        '--pre-download-schaefer',
+        action='store_true',
+        help='Pre-download and cache Schaefer 2018 atlas configurations'
+    )
     
     return parser.parse_args()
 
@@ -1583,6 +1714,17 @@ def main():
     
     if args.check_compatibility:
         check_nilearn_compatibility()
+        return
+    
+    if args.fix_nilearn_data:
+        print("Fixing Nilearn data directory issues...")
+        data_dir = fix_nilearn_data_directory()
+        print(f"✅ Nilearn data directory fixed: {data_dir}")
+        print("You can now run the script normally.")
+        return
+    
+    if args.pre_download_schaefer:
+        pre_download_schaefer_2018_atlas()
         return
 
     # Validate arguments

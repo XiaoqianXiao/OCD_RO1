@@ -20,14 +20,28 @@ USAGE EXAMPLES:
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data
 
-2. With Specific Atlas Name:
+2. Schaefer 2018 Atlas (400 ROIs, 7 networks):
+   python NW_group2.py \\
+     --subjects_csv group.csv \\
+     --clinical_csv clinical.csv \\
+     --input_dir /path/to/fc/data \\
+     --atlas_name schaefer_2018_400_7_2
+
+3. Schaefer 2018 Atlas (1000 ROIs, 17 networks):
+   python NW_group2.py \\
+     --subjects_csv group.csv \\
+     --clinical_csv clinical.csv \\
+     --input_dir /path/to/fc/data \\
+     --atlas_name schaefer_2018_1000_17_1
+
+4. With Specific Atlas Name:
    python NW_group2.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name power_2011
 
-3. Auto-detect Atlas from Input Files:
+5. Auto-detect Atlas from Input Files:
    python NW_group2.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
@@ -39,8 +53,15 @@ ATLAS NAMING CONVENTIONS:
 
 The script automatically detects atlas names from input FC files:
 - Power 2011: power_2011_network_fc_avg.csv
-- Schaefer 2018: schaefer_2018_400_7_2_network_fc_avg.csv
+- Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}_network_fc_avg.csv
+  Examples:
+    - schaefer_2018_400_7_2_network_fc_avg.csv (400 ROIs, 7 networks, 2mm)
+    - schaefer_2018_1000_17_1_network_fc_avg.csv (1000 ROIs, 17 networks, 1mm)
 - Custom: custom_atlas_network_fc_avg.csv
+
+Note: For Schaefer 2018, the naming follows the pattern: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}
+where n_rois can be 100, 200, 300, 400, 500, 600, 700, 800, 900, or 1000,
+yeo_networks can be 7 or 17, and resolution_mm can be 1 or 2.
 
 OUTPUT FILES:
 ============
@@ -81,7 +102,7 @@ warnings.filterwarnings('ignore')
 # Default configuration
 DEFAULT_CONFIG = {
     'output_dir': '/project/6079231/dliang55/R01_AOCD/NW_group',
-    'input_dir': '/input',
+    'input_dir': '/project/6079231/dliang55/R01_AOCD',
     'log_file': 'network_fc_analysis.log',
     'sessions': ['ses-baseline', 'ses-followup'],
     'min_subjects_per_group': 2,
@@ -145,6 +166,20 @@ Examples:
     --clinical_csv clinical.csv \\
     --input_dir /path/to/fc/data
 
+  # Schaefer 2018 Atlas (400 ROIs, 7 networks)
+  python NW_group2.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data \\
+    --atlas_name schaefer_2018_400_7_2
+
+  # Schaefer 2018 Atlas (1000 ROIs, 17 networks)
+  python NW_group2.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data \\
+    --atlas_name schaefer_2018_1000_17_1
+
   # With Specific Atlas Name
   python NW_group2.py \\
     --subjects_csv group.csv \\
@@ -189,7 +224,7 @@ Run with --help for full help.
     parser.add_argument(
         '--atlas_name',
         type=str,
-        help='Explicitly specify the atlas name (e.g., power_2011, schaefer_2018_400_7_2)'
+        help='Explicitly specify the atlas name (e.g., power_2011, schaefer_2018_400_7_2, schaefer_2018_1000_17_1)'
     )
     parser.add_argument(
         '--auto-detect-atlas',
@@ -987,8 +1022,15 @@ ATLAS NAMING CONVENTIONS:
 -------------------------
 The script automatically detects atlas names from input FC files:
 - Power 2011: power_2011_network_fc_avg.csv
-- Schaefer 2018: schaefer_2018_400_7_2_network_fc_avg.csv
+- Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}_network_fc_avg.csv
+  Examples:
+    - schaefer_2018_400_7_2_network_fc_avg.csv (400 ROIs, 7 networks, 2mm)
+    - schaefer_2018_1000_17_1_network_fc_avg.csv (1000 ROIs, 17 networks, 1mm)
 - Custom: custom_atlas_network_fc_avg.csv
+
+Note: For Schaefer 2018, the naming follows the pattern: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}
+where n_rois can be 100, 200, 300, 400, 500, 600, 700, 800, 900, or 1000,
+yeo_networks can be 7 or 17, and resolution_mm can be 1 or 2.
 
 DIFFERENCE FROM NW_group.py:
 ----------------------------
