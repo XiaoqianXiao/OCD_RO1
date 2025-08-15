@@ -725,7 +725,7 @@ echo "Subjects: $SUBJECTS"
 echo "=" * 80
 
 # Define bind paths for Apptainer, avoiding redundant mounts
-APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian:/scratch/xxqian,/scratch/xxqian/repo/OCD_RO1/NW_1st.py:/app/NW_1st.py"
+APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian:/scratch/xxqian,/scratch/xxqian/repo/OCD_RO1:/app"
 
 # Submit jobs for each subject
 for subject in "${SUBJECT_ARRAY[@]}"; do

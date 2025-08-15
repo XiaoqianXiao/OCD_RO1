@@ -409,7 +409,7 @@ echo "Analysis Type: Seed-to-Voxel (PCC seed)"
 echo "Container: $CONTAINER"
 
 # Define bind paths for Apptainer, avoiding redundant mounts
-APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian:/scratch/xxqian,/scratch/xxqian/repo/OCD_RO1/STV_1st.py:/app/STV_1st.py"
+APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01_AOCD,/scratch/xxqian:/scratch/xxqian,/scratch/xxqian/repo/OCD_RO1:/app"
 
 echo "SLURM Time: $SLURM_TIME"
 echo "SLURM Memory: $SLURM_MEM"
