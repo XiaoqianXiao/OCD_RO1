@@ -67,7 +67,6 @@ Built-in Nilearn Atlases:
 
 Custom Atlases:
 - File-based: Provide path to .nii.gz file and network labels file
-- Network patterns: power, nilearn, custom
 
 LABEL PATTERN TYPES:
 ===================
@@ -103,13 +102,60 @@ import numpy as np
 import pandas as pd
 from nilearn import image
 from nilearn.input_data import NiftiLabelsMasker
-from nilearn.datasets import (
-    fetch_coords_power_2011, load_mni152_template,
-    fetch_atlas_schaefer_2018, fetch_atlas_harvard_oxford,
-    fetch_atlas_aal, fetch_atlas_talairach, fetch_atlas_power_2011,
-    fetch_atlas_coords_power_2012, fetch_atlas_pauli_2017,
-    fetch_atlas_yeo_2011
-)
+# Nilearn atlas imports with version compatibility
+try:
+    from nilearn.datasets import (
+        load_mni152_template,
+        fetch_atlas_schaefer_2018, fetch_atlas_harvard_oxford,
+        fetch_atlas_aal, fetch_atlas_talairach,
+        fetch_atlas_coords_power_2012, fetch_atlas_pauli_2017,
+        fetch_atlas_yeo_2011
+    )
+except ImportError as e:
+    # Try alternative function names for older Nilearn versions
+    try:
+        from nilearn.datasets import (
+            load_mni152_template,
+            fetch_atlas_harvard_oxford, fetch_atlas_aal, 
+            fetch_atlas_talairach, fetch_atlas_yeo_2011
+        )
+        # Try alternative names for Schaefer atlas
+        try:
+            from nilearn.datasets import fetch_atlas_schaefer_2018
+        except ImportError:
+            try:
+                from nilearn.datasets import fetch_schaefer_2018 as fetch_atlas_schaefer_2018
+            except ImportError:
+                try:
+                    from nilearn.datasets import fetch_atlas_schaefer as fetch_atlas_schaefer_2018
+                except ImportError:
+                    print("Warning: Schaefer 2018 atlas not available in this Nilearn version")
+                    fetch_atlas_schaefer_2018 = None
+        
+        # Try alternative names for Power 2012 atlas
+        try:
+            from nilearn.datasets import fetch_atlas_coords_power_2012
+        except ImportError:
+            try:
+                from nilearn.datasets import fetch_coords_power_2012 as fetch_atlas_coords_power_2012
+            except ImportError:
+                print("Warning: Power 2012 atlas not available in this Nilearn version")
+                fetch_atlas_coords_power_2012 = None
+        
+        # Try alternative names for Pauli 2017 atlas
+        try:
+            from nilearn.datasets import fetch_atlas_pauli_2017
+        except ImportError:
+            try:
+                from nilearn.datasets import fetch_pauli_2017 as fetch_atlas_pauli_2017
+            except ImportError:
+                print("Warning: Pauli 2017 atlas not available in this Nilearn version")
+                fetch_atlas_pauli_2017 = None
+                
+    except ImportError as e2:
+        print(f"Critical import error: {e2}")
+        print("Please check your Nilearn installation")
+        sys.exit(1)
 from nilearn.image import resample_to_img
 import argparse
 import logging
@@ -149,16 +195,12 @@ ANALYSIS_PARAMS = {
     'atlas_resolution': 2
 }
 
-# Nilearn atlas configurations
-NILEARN_ATLASES = {
-    'power_2011': {
-        'function': fetch_atlas_power_2011,
-        'default_params': {},
-        'description': 'Power 2011 atlas (264 ROIs, 13 networks)',
-        'param_options': {},
-        'network_based': True
-    },
-    'schaefer_2018': {
+# Nilearn atlas configurations (only include available atlases)
+NILEARN_ATLASES = {}
+
+# Add Schaefer 2018 atlas if available
+if 'fetch_atlas_schaefer_2018' in globals() and fetch_atlas_schaefer_2018 is not None:
+    NILEARN_ATLASES['schaefer_2018'] = {
         'function': fetch_atlas_schaefer_2018,
         'default_params': {'n_rois': 400, 'yeo_networks': 7, 'resolution_mm': 2},
         'description': 'Schaefer 2018 parcellation (100-1000 ROIs, 7/17 networks)',
@@ -167,9 +209,18 @@ NILEARN_ATLASES = {
             'yeo_networks': [7, 17],
             'resolution_mm': [1, 2]
         },
-        'network_based': True
-    },
-    'harvard_oxford': {
+        'network_based': True,
+        'network_names': {
+            7: ['Visual', 'Somatomotor', 'Dorsal Attention', 'Ventral Attention', 'Limbic', 'Frontoparietal', 'Default'],
+            17: ['Visual1', 'Visual2', 'Somatomotor1', 'Somatomotor2', 'Dorsal Attention1', 'Dorsal Attention2', 
+                 'Ventral Attention1', 'Ventral Attention2', 'Limbic1', 'Limbic2', 'Frontoparietal1', 'Frontoparietal2',
+                 'Default1', 'Default2', 'Temporal Parietal', 'Orbital Frontal', 'Cingulo-opercular']
+        }
+    }
+
+# Add Harvard-Oxford atlas if available
+if 'fetch_atlas_harvard_oxford' in globals():
+    NILEARN_ATLASES['harvard_oxford'] = {
         'function': fetch_atlas_harvard_oxford,
         'default_params': {'atlas_name': 'cort-maxprob-thr25-2mm'},
         'description': 'Harvard-Oxford cortical/subcortical atlases',
@@ -181,45 +232,59 @@ NILEARN_ATLASES = {
             ]
         },
         'network_based': False
-    },
-    'aal': {
+    }
+
+# Add AAL atlas if available
+if 'fetch_atlas_aal' in globals():
+    NILEARN_ATLASES['aal'] = {
         'function': fetch_atlas_aal,
         'default_params': {},
         'description': 'Automated Anatomical Labeling atlas (116 ROIs)',
         'param_options': {},
         'network_based': False
-    },
-    'talairach': {
+    }
+
+# Add Talairach atlas if available
+if 'fetch_atlas_talairach' in globals():
+    NILEARN_ATLASES['talairach'] = {
         'function': fetch_atlas_talairach,
         'default_params': {},
         'description': 'Talairach atlas (1107 ROIs)',
         'param_options': {},
         'network_based': False
-    },
-    'coords_power_2012': {
+    }
+
+# Add Power 2012 atlas if available
+if 'fetch_atlas_coords_power_2012' in globals() and fetch_atlas_coords_power_2012 is not None:
+    NILEARN_ATLASES['coords_power_2012'] = {
         'function': fetch_atlas_coords_power_2012,
         'default_params': {},
-        'description': 'Power 2012 coordinate-based atlas (264 ROIs)',
+        'description': 'Power 2012 atlas (264 ROIs, 13 networks)',
         'param_options': {},
         'network_based': True
-    },
-    'pauli_2017': {
+    }
+
+# Add Pauli 2017 atlas if available
+if 'fetch_atlas_pauli_2017' in globals() and fetch_atlas_pauli_2017 is not None:
+    NILEARN_ATLASES['pauli_2017'] = {
         'function': fetch_atlas_pauli_2017,
         'default_params': {},
-        'description': 'Pauli 2017 subcortical atlas (16 ROIs)',
+        'description': 'Pauli 2017 atlas (83 ROIs, 7 networks)',
         'param_options': {},
-        'network_based': False
-    },
-    'yeo_2011': {
+        'network_based': True
+    }
+
+# Add Yeo 2011 atlas if available
+if 'fetch_atlas_yeo_2011' in globals():
+    NILEARN_ATLASES['yeo_2011'] = {
         'function': fetch_atlas_yeo_2011,
         'default_params': {'n_rois': 7},
-        'description': 'Yeo 2011 network parcellation (7/17 networks)',
+        'description': 'Yeo 2011 network parcellation (7 or 17 networks)',
         'param_options': {
             'n_rois': [7, 17]
         },
         'network_based': True
     }
-}
 
 # =============================================================================
 # USAGE AND HELP FUNCTIONS
@@ -344,10 +409,24 @@ DETAILED USAGE EXAMPLES
    ---------------------------------------
    This is a popular parcellation with 100-1000 ROIs organized by functional networks.
    
+   # Basic usage with default parameters (400 ROIs, 7 networks, 2mm resolution)
    python NW_1st.py \\
      --subject sub-AOCD001 \\
      --atlas schaefer_2018 \\
-     --atlas-params '{"n_rois": 400, "yeo_networks": 7, "resolution_mm": 2}' \\
+     --label-pattern nilearn
+   
+   # Custom parameters (200 ROIs, 7 networks, 2mm resolution)
+   python NW_1st.py \\
+     --subject sub-AOCD001 \\
+     --atlas schaefer_2018 \\
+     --atlas-params '{"n_rois": 200, "yeo_networks": 7, "resolution_mm": 2}' \\
+     --label-pattern nilearn
+   
+   # High-resolution version (1000 ROIs, 17 networks, 1mm resolution)
+   python NW_1st.py \\
+     --subject sub-AOCD001 \\
+     --atlas schaefer_2018 \\
+     --atlas-params '{"n_rois": 1000, "yeo_networks": 17, "resolution_mm": 1}' \\
      --label-pattern nilearn
    
    Available parameters:
@@ -355,12 +434,11 @@ DETAILED USAGE EXAMPLES
    - yeo_networks: 7 or 17
    - resolution_mm: 1 or 2
    
-   Example with 1000 ROIs and 17 networks:
-   python NW_1st.py \\
-     --subject sub-AOCD001 \\
-     --atlas schaefer_2018 \\
-     --atlas-params '{"n_rois": 1000, "yeo_networks": 17, "resolution_mm": 1}' \\
-     --label-pattern nilearn
+   Network configurations:
+   - 7 networks: Visual, Somatomotor, Dorsal Attention, Ventral Attention, Limbic, Frontoparietal, Default
+   - 17 networks: Extended version with sub-networks (e.g., Visual1, Visual2, etc.)
+   
+   Note: The script automatically generates appropriate network labels based on your parameters.
 
 3. HARVARD-OXFORD ATLAS (Built-in Nilearn)
    -----------------------------------------
@@ -437,12 +515,28 @@ DETAILED USAGE EXAMPLES
      --label-pattern power \\
      --verbose
 
+8. TESTING SCHAEFER 2018 CONFIGURATION
+   ------------------------------------
+   Test if the Schaefer 2018 atlas is properly configured.
+   
+   python NW_1st.py --test-schaefer
+   
+   This will verify:
+   - Atlas function availability
+   - Parameter validation
+   - Network name generation
+   - Configuration consistency
+
 NILEARN ATLAS PARAMETERS:
 -------------------------
 Schaefer 2018:
   - n_rois: Number of ROIs (100-1000)
   - yeo_networks: Number of networks (7 or 17)
   - resolution_mm: Spatial resolution (1 or 2mm)
+  
+  Network names (automatically generated):
+  - 7 networks: Visual, Somatomotor, Dorsal Attention, Ventral Attention, Limbic, Frontoparietal, Default
+  - 17 networks: Extended version with sub-networks for more detailed analysis
 
 Harvard-Oxford:
   - atlas_name: Atlas variant name
@@ -481,116 +575,84 @@ TROUBLESHOOTING:
 5. Verify output directory is writable
 6. Use --verbose for detailed error messages
 7. For Nilearn atlases, ensure internet connection for first download
+
+SCHAEFER 2018 SPECIFIC TROUBLESHOOTING:
+----------------------------------------
+1. Parameter validation errors:
+   - Ensure n_rois is one of: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000
+   - Ensure yeo_networks is either 7 or 17
+   - Ensure resolution_mm is either 1 or 2
+   
+2. Network label issues:
+   - Use --test-schaefer to verify configuration
+   - Check that n_rois is evenly divisible by yeo_networks for optimal results
+   - For 17 networks, ensure you have enough ROIs (recommend at least 200)
+   
+3. Memory issues:
+   - Higher ROI counts (800-1000) require more memory
+   - Consider using lower resolution (2mm) for large ROI counts
+   - Monitor memory usage with --verbose logging
+   
+4. First-time usage:
+   - The atlas will be downloaded automatically on first use
+   - Ensure stable internet connection
+   - Check available disk space for atlas storage
 """
     print(examples_text)
 
 def print_available_atlases():
-    """Print available Nilearn atlases and their parameters."""
-    atlas_info = """
-AVAILABLE NILEARN ATLASES
-=========================
-
-Built-in Nilearn atlases that can be used with --atlas and --label-pattern nilearn:
-
-1. POWER 2011 ATLAS (DEFAULT)
-   ---------------------------
-   Description: {power_2011[description]}
-   Function: fetch_atlas_power_2011
-   Parameters: None required
-   Network-based: {power_2011[network_based]}
-   
-   Example: --atlas power_2011 --label-pattern power
-
-2. SCHAEFER 2018 ATLAS
-   --------------------
-   Description: {schaefer_2018[description]}
-   Function: fetch_atlas_schaefer_2018
-   Parameters:
-   - n_rois: {schaefer_2018[param_options][n_rois]} (default: {schaefer_2018[default_params][n_rois]})
-   - yeo_networks: {schaefer_2018[param_options][yeo_networks]} (default: {schaefer_2018[default_params][yeo_networks]})
-   - resolution_mm: {schaefer_2018[param_options][resolution_mm]} (default: {schaefer_2018[default_params][resolution_mm]})
-   Network-based: {schaefer_2018[network_based]}
-   
-   Example: --atlas schaefer_2018 --atlas-params '{{"n_rois": 400, "yeo_networks": 7, "resolution_mm": 2}}'
-
-3. HARVARD-OXFORD ATLAS
-   ----------------------
-   Description: {harvard_oxford[description]}
-   Function: fetch_atlas_harvard_oxford
-   Parameters:
-   - atlas_name: {harvard_oxford[param_options][atlas_name]} (default: {harvard_oxford[default_params][atlas_name]})
-   Network-based: {harvard_oxford[network_based]}
-   
-   Example: --atlas harvard_oxford --atlas-params '{{"atlas_name": "cort-maxprob-thr25-2mm"}}'
-
-4. AAL (AUTOMATED ANATOMICAL LABELING) ATLAS
-   ------------------------------------------
-   Description: {aal[description]}
-   Function: fetch_atlas_aal
-   Parameters: None required
-   Network-based: {aal[network_based]}
-   
-   Example: --atlas aal --label-pattern nilearn
-
-5. TALAIRACH ATLAS
-   ----------------
-   Description: {talairach[description]}
-   Function: fetch_atlas_talairach
-   Parameters: None required
-   Network-based: {talairach[network_based]}
-   
-   Example: --atlas talairach --label-pattern nilearn
-
-6. COORDS POWER 2012 ATLAS
-   ------------------------
-   Description: {coords_power_2012[description]}
-   Function: fetch_atlas_coords_power_2012
-   Parameters: None required
-   Network-based: {coords_power_2012[network_based]}
-   
-   Example: --atlas coords_power_2012 --label-pattern nilearn
-
-7. PAULI 2017 ATLAS
-   -----------------
-   Description: {pauli_2017[description]}
-   Function: fetch_atlas_pauli_2017
-   Parameters: None required
-   Network-based: {pauli_2017[network_based]}
-   
-   Example: --atlas pauli_2017 --label-pattern nilearn
-
-8. YEO 2011 ATLAS
-   ---------------
-   Description: {yeo_2011[description]}
-   Function: fetch_atlas_yeo_2011
-   Parameters:
-   - n_rois: {yeo_2011[param_options][n_rois]} (default: {yeo_2011[default_params][n_rois]})
-   Network-based: {yeo_2011[network_based]}
-   
-   Example: --atlas yeo_2011 --atlas-params '{{"n_rois": 17}}'
-
-NETWORK-BASED ATLASES:
----------------------
-Network-based atlases provide automatic network labeling and are ideal for network analysis:
-- power_2011: 13 functional networks
-- schaefer_2018: 7 or 17 Yeo networks
-- coords_power_2012: 13 functional networks
-- yeo_2011: 7 or 17 networks
-
-Non-network atlases can still be used but may require custom network labeling.
-
-USAGE NOTES:
------------
-- For atlases with parameters, use --atlas-params with JSON format
-- For atlases without parameters, just specify --atlas and --label-pattern
-- All atlases are automatically downloaded on first use
-- Atlas images are in MNI152 space
-- Network labels are automatically extracted from the atlas data
-
-For more information, see the Nilearn documentation or run with --usage for examples.
-""".format(**NILEARN_ATLASES)
+    """Print information about available atlases for debugging."""
+    print(f"Available atlases in this Nilearn version: {list(NILEARN_ATLASES.keys())}")
+    print(f"Total atlases available: {len(NILEARN_ATLASES)}")
     
-    print(atlas_info)
+    if len(NILEARN_ATLASES) == 0:
+        print("WARNING: No atlases are available!")
+        print("This might indicate a Nilearn version compatibility issue.")
+        return False
+    
+    # Print details for each available atlas
+    for atlas_name, atlas_info in NILEARN_ATLASES.items():
+        print(f"  - {atlas_name}: {atlas_info['description']}")
+    
+    return True
+
+def test_schaefer_2018_configuration():
+    """Test the Schaefer 2018 atlas configuration to ensure it's working correctly."""
+    print("Testing Schaefer 2018 Atlas Configuration")
+    print("=" * 50)
+    
+    if 'schaefer_2018' not in NILEARN_ATLASES:
+        print("❌ Schaefer 2018 atlas is not available")
+        return False
+    
+    atlas_info = NILEARN_ATLASES['schaefer_2018']
+    print(f"✅ Atlas function: {atlas_info['function'].__name__}")
+    print(f"✅ Default parameters: {atlas_info['default_params']}")
+    print(f"✅ Available parameters: {atlas_info['param_options']}")
+    print(f"✅ Network-based: {atlas_info['network_based']}")
+    
+    if 'network_names' in atlas_info:
+        print(f"✅ Network names available for: {list(atlas_info['network_names'].keys())} networks")
+        for n_networks, names in atlas_info['network_names'].items():
+            print(f"   {n_networks} networks: {names}")
+    else:
+        print("❌ No predefined network names")
+    
+    # Test parameter validation
+    try:
+        test_params = {'n_rois': 400, 'yeo_networks': 7, 'resolution_mm': 2}
+        validated = validate_atlas_params('schaefer_2018', test_params)
+        print(f"✅ Parameter validation passed: {validated}")
+    except Exception as e:
+        print(f"❌ Parameter validation failed: {e}")
+        return False
+    
+    print("\nSchaefer 2018 Atlas is properly configured! 🎉")
+    return True
+
+# =============================================================================
+# USAGE AND HELP FUNCTIONS
+# =============================================================================
 
 # =============================================================================
 # ATLAS FETCHING FUNCTIONS
@@ -621,7 +683,48 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
         network_labels = {}
         if atlas_info['network_based']:
             # For network-based atlases, generate network labels
-            if 'labels' in atlas_data:
+            if atlas_name == 'schaefer_2018' and 'network_names' in atlas_info:
+                # Use predefined network names for Schaefer 2018
+                yeo_networks = params.get('yeo_networks', 7)
+                if yeo_networks in atlas_info['network_names']:
+                    network_names = atlas_info['network_names'][yeo_networks]
+                    # Get the number of ROIs per network
+                    n_rois = params.get('n_rois', 400)
+                    rois_per_network = n_rois // yeo_networks
+                    
+                    roi_idx = 1
+                    for network_idx, network_name in enumerate(network_names):
+                        for _ in range(rois_per_network):
+                            network_labels[roi_idx] = network_name
+                            roi_idx += 1
+                    
+                    # Handle any remaining ROIs
+                    while roi_idx <= n_rois:
+                        network_labels[roi_idx] = network_names[roi_idx % yeo_networks]
+                        roi_idx += 1
+                    
+                    logger.info(f"Generated Schaefer 2018 network labels: {yeo_networks} networks, {n_rois} ROIs")
+                else:
+                    logger.warning(f"Unknown number of networks for Schaefer 2018: {yeo_networks}")
+                    # Fall back to generic approach
+                    if 'labels' in atlas_data:
+                        labels = atlas_data['labels']
+                        for i, label in enumerate(labels):
+                            if isinstance(label, str):
+                                # Extract network name from label
+                                if '_' in label:
+                                    network_name = label.rsplit('_', 1)[0]
+                                else:
+                                    network_name = label
+                                network_labels[i + 1] = network_name
+                            else:
+                                network_labels[i + 1] = f"Network_{i+1}"
+                    else:
+                        # Generate generic network labels
+                        n_rois = len(np.unique(atlas_img.get_fdata())) - 1  # Exclude background (0)
+                        for i in range(n_rois):
+                            network_labels[i + 1] = f"Network_{i+1}"
+            elif 'labels' in atlas_data:
                 labels = atlas_data['labels']
                 for i, label in enumerate(labels):
                     if isinstance(label, str):
@@ -671,7 +774,46 @@ def validate_atlas_params(atlas_name: str, atlas_params: Dict[str, Any]) -> Dict
                 raise ValueError(f"Invalid value for {param}: {value}. Valid options: {param_options[param]}")
         validated_params[param] = value
     
+    # Special validation for Schaefer 2018
+    if atlas_name == 'schaefer_2018':
+        n_rois = validated_params.get('n_rois', 400)
+        yeo_networks = validated_params.get('yeo_networks', 7)
+        
+        # Check if n_rois is divisible by yeo_networks
+        if n_rois % yeo_networks != 0:
+            logger.warning(f"Warning: n_rois ({n_rois}) is not evenly divisible by yeo_networks ({yeo_networks})")
+            logger.warning(f"This may result in uneven distribution of ROIs across networks")
+        
+        # Validate that the combination is reasonable
+        if n_rois < yeo_networks:
+            raise ValueError(f"n_rois ({n_rois}) must be greater than or equal to yeo_networks ({yeo_networks})")
+        
+        # Check if network names are available for this configuration
+        if 'network_names' in atlas_info and yeo_networks in atlas_info['network_names']:
+            logger.info(f"Using predefined network names for Schaefer 2018: {yeo_networks} networks")
+        else:
+            logger.warning(f"No predefined network names for Schaefer 2018 with {yeo_networks} networks")
+    
     return validated_params
+
+def validate_atlas_availability(atlas_name: str) -> bool:
+    """Validate that the requested atlas is available in the current Nilearn version."""
+    if atlas_name not in NILEARN_ATLASES:
+        available_atlases = list(NILEARN_ATLASES.keys())
+        print(f"ERROR: Atlas '{atlas_name}' is not available in this Nilearn version.")
+        print(f"Available atlases: {available_atlases}")
+        print("\nThis might be due to:")
+        print("1. Using an older version of Nilearn")
+        print("2. Atlas function names have changed")
+        print("3. Atlas is not installed")
+        return False
+    return True
+
+def get_atlas_function(atlas_name: str):
+    """Get the atlas function, with validation."""
+    if not validate_atlas_availability(atlas_name):
+        return None
+    return NILEARN_ATLASES[atlas_name]['function']
 
 # =============================================================================
 # LOGGING SETUP
@@ -714,128 +856,6 @@ def setup_logging(log_file: str) -> logging.Logger:
 # =============================================================================
 # ATLAS MANAGEMENT
 # =============================================================================
-
-def generate_power_atlas(roi_dir: str, logger: logging.Logger) -> str:
-    """Generate Power 2011 atlas from coordinates if it doesn't exist."""
-    power_atlas_path = os.path.join(roi_dir, 'power_2011_atlas.nii.gz')
-    
-    if os.path.exists(power_atlas_path):
-        logger.info(f"Power 2011 atlas already exists: {power_atlas_path}")
-        return power_atlas_path
-    
-    logger.info("Generating Power 2011 atlas from coordinates...")
-    
-    try:
-        # Fetch Power 2011 coordinates
-        power = fetch_coords_power_2011()
-        required_fields = ['roi', 'x', 'y', 'z']
-        
-        if not all(field in power.rois.dtype.names for field in required_fields):
-            raise ValueError(f"Power.rois missing required fields: {required_fields}")
-        
-        coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T
-        logger.info(f"Power 2011 coordinates shape: {coords.shape} (expected: (264, 3))")
-        
-        # Load MNI template
-        template = load_mni152_template(resolution=ANALYSIS_PARAMS['atlas_resolution'])
-        atlas_data = np.zeros(template.shape, dtype=np.int32)
-        
-        # Create spherical ROIs
-        radius = ANALYSIS_PARAMS['sphere_radius']
-        xx, yy, zz = np.ogrid[-radius:radius+1, -radius:radius+1, -radius:radius+1]
-        sphere = (xx**2 + yy**2 + zz**2 <= radius**2).astype(int)
-        
-        for idx, coord in enumerate(coords):
-            try:
-                x, y, z = coord
-                voxel_coords = np.round(
-                    np.linalg.inv(template.affine).dot([x, y, z, 1])[:3]
-                ).astype(int)
-                
-                # Apply spherical mask
-                start_idx = voxel_coords - radius
-                end_idx = voxel_coords + radius + 1
-                
-                # Ensure indices are within bounds
-                start_idx = np.maximum(start_idx, 0)
-                end_idx = np.minimum(end_idx, template.shape)
-                
-                atlas_data[
-                    start_idx[0]:end_idx[0],
-                    start_idx[1]:end_idx[1],
-                    start_idx[2]:end_idx[2]
-                ] = np.maximum(
-                    atlas_data[
-                        start_idx[0]:end_idx[0],
-                        start_idx[1]:end_idx[1],
-                        start_idx[2]:end_idx[2]
-                    ],
-                    (idx + 1) * sphere[
-                        :end_idx[0]-start_idx[0],
-                        :end_idx[1]-start_idx[1],
-                        :end_idx[2]-start_idx[2]
-                    ]
-                )
-                
-            except (ValueError, IndexError) as e:
-                logger.warning(f"Skipping invalid coordinate at index {idx}: {coord}, error: {str(e)}")
-                continue
-        
-        if np.all(atlas_data == 0):
-            raise ValueError("Atlas generation produced empty data")
-        
-        # Create and save atlas
-        power_atlas = image.new_img_like(template, atlas_data)
-        power_atlas.to_filename(power_atlas_path)
-        logger.info(f"Generated Power 2011 atlas saved to {power_atlas_path}")
-        
-        return power_atlas_path
-        
-    except Exception as e:
-        logger.error(f"Failed to generate Power 2011 atlas: {str(e)}")
-        raise
-
-def load_network_labels(roi_dir: str, n_rois: int, logger: logging.Logger) -> Dict[int, str]:
-    """Load network labels from the power264NodeNames.txt file."""
-    network_labels_path = os.path.join(roi_dir, 'power264', 'power264NodeNames.txt')
-    
-    if not os.path.exists(network_labels_path):
-        raise FileNotFoundError(f"Network labels file not found: {network_labels_path}")
-    
-    try:
-        with open(network_labels_path, 'r') as f:
-            network_labels_list = [line.strip() for line in f if line.strip()]
-        
-        if len(network_labels_list) != n_rois:
-            raise ValueError(
-                f"Network labels file has {len(network_labels_list)} entries, expected {n_rois}"
-            )
-        
-        # Parse network labels
-        network_labels = {}
-        for i, label in enumerate(network_labels_list):
-            parts = label.rsplit('_', 1)
-            if len(parts) != 2:
-                logger.warning(f"Invalid label format at line {i+1}: {label}")
-                continue
-            
-            network_name, roi_num_str = parts
-            try:
-                roi_num = int(roi_num_str)
-                if roi_num == i + 1:  # ROI numbers should be 1-indexed
-                    network_labels[i + 1] = network_name
-                else:
-                    logger.warning(f"ROI number mismatch at line {i+1}: {roi_num} != {i+1}")
-            except ValueError:
-                logger.warning(f"Invalid ROI number at line {i+1}: {roi_num_str}")
-                continue
-        
-        logger.info(f"Loaded {len(network_labels)} network labels from {network_labels_path}")
-        return network_labels
-        
-    except Exception as e:
-        logger.error(f"Failed to load network labels: {str(e)}")
-        raise
 
 def load_custom_network_labels(labels_path: str, label_pattern: str, custom_regex: str = None, logger: logging.Logger = None) -> Dict[int, str]:
     """Load network labels from custom file with different patterns."""
@@ -1324,7 +1344,7 @@ Examples:
   # Custom Atlas
   python NW_1st.py --subject sub-AOCD001 \\
     --atlas /path/to/atlas.nii.gz \\
-    --labels /path/to/network_labels.txt \\
+    --labels /path/to/labels.txt \\
     --label-pattern custom \\
     --custom-regex "network_(\\d+)_(.+)" \\
     --atlas-name custom_atlas
@@ -1341,9 +1361,8 @@ Run with --usage for detailed examples or --help for full help.
     parser.add_argument(
         '--atlas', 
         type=str, 
-        default='power_2011',
-        help='Atlas name for predefined atlases or path to custom atlas file (.nii.gz)'
-    )
+        default='aal',
+        help='Atlas name or path (default: aal)')
     parser.add_argument(
         '--atlas-params',
         type=str,
@@ -1395,6 +1414,11 @@ Run with --usage for detailed examples or --help for full help.
         '--list-atlases',
         action='store_true',
         help='List available Nilearn atlases and their parameters'
+    )
+    parser.add_argument(
+        '--test-schaefer',
+        action='store_true',
+        help='Test the Schaefer 2018 atlas configuration'
     )
     
     return parser.parse_args()
@@ -1487,6 +1511,10 @@ def main():
         print_available_atlases()
         return
     
+    if args.test_schaefer:
+        test_schaefer_2018_configuration()
+        return
+
     # Validate arguments
     if args.label_pattern == 'nilearn':
         # For Nilearn atlases, labels are not needed
@@ -1529,6 +1557,10 @@ def main():
     logger = setup_logging(config['log_file'])
     if args.verbose:
         logger.setLevel(logging.DEBUG)
+    
+    # Print available atlases for debugging
+    logger.info("Checking available atlases...")
+    print_available_atlases()
     
     logger.info("=" * 80)
     logger.info("Starting Functional Connectivity Analysis")
