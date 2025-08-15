@@ -444,6 +444,30 @@ EOF
 # ARGUMENT PARSING
 # =============================================================================
 
+# Initialize variables with defaults
+BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
+OUTPUT_DIR="/scratch/xxqian/OCD"
+WORK_DIR="/scratch/xxqian/work_flow"
+SLURM_SCRIPTS_DIR="/scratch/xxqian/slurm_jobs"
+ROI_DIR="/scratch/xxqian/roi"
+CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
+PYTHON_SCRIPT="/scratch/xxqian/repo/OCD_RO1/NW_1st.py"
+SLURM_TIME="4:00:00"
+SLURM_MEM="16G"
+SLURM_CPUS="2"
+SLURM_ACCOUNT="xxqian"
+SLURM_MAIL_TYPE="END"
+SLURM_MAIL_USER="xxqian@stanford.edu"
+ATLAS="power_2011"
+LABELS=""
+LABEL_PATTERN="power"
+ATLAS_PARAMS=""
+CUSTOM_REGEX=""
+ATLAS_NAME=""
+SUBJECTS=""
+VERBOSE=""
+DRY_RUN=false
+
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -542,30 +566,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# Initialize variables with defaults
-BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
-OUTPUT_DIR="/scratch/xxqian/OCD"
-WORK_DIR="/scratch/xxqian/work_flow"
-SLURM_SCRIPTS_DIR="/scratch/xxqian/slurm_jobs"
-ROI_DIR="/scratch/xxqian/roi"
-CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
-PYTHON_SCRIPT="/scratch/xxqian/repo/OCD_RO1/NW_1st.py"
-SLURM_TIME="4:00:00"
-SLURM_MEM="16G"
-SLURM_CPUS="2"
-SLURM_ACCOUNT="xxqian"
-SLURM_MAIL_TYPE="END"
-SLURM_MAIL_USER="xxqian@stanford.edu"
-ATLAS="power_2011"
-LABELS=""
-LABEL_PATTERN="power"
-ATLAS_PARAMS=""
-CUSTOM_REGEX=""
-ATLAS_NAME=""
-SUBJECTS=""
-VERBOSE=""
-DRY_RUN=false
 
 # =============================================================================
 # VALIDATION AND SETUP
