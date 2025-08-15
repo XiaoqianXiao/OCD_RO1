@@ -156,6 +156,20 @@ except ImportError as e:
         print(f"Critical import error: {e2}")
         print("Please check your Nilearn installation")
         sys.exit(1)
+
+# Handle different Nilearn versions for image types
+try:
+    from nilearn.image import Nifti1Image
+except ImportError:
+    try:
+        # For older Nilearn versions
+        from nilearn.image import new_img_like
+        # Create a type alias for compatibility
+        Nifti1Image = type(new_img_like)
+    except ImportError:
+        # Fallback to generic type
+        Nifti1Image = object
+
 from nilearn.image import resample_to_img
 import argparse
 import logging
@@ -650,6 +664,38 @@ def test_schaefer_2018_configuration():
     print("\nSchaefer 2018 Atlas is properly configured! 🎉")
     return True
 
+def check_nilearn_compatibility():
+    """Check Nilearn version compatibility and atlas availability."""
+    try:
+        import nilearn
+        print(f"Nilearn version: {nilearn.__version__}")
+        
+        # Check which atlases are available
+        available_atlases = []
+        for atlas_name, atlas_info in NILEARN_ATLASES.items():
+            if atlas_info['function'] is not None:
+                available_atlases.append(atlas_name)
+            else:
+                print(f"⚠️  {atlas_name}: Not available in this Nilearn version")
+        
+        print(f"Available atlases: {available_atlases}")
+        
+        if not available_atlases:
+            print("❌ No atlases available! This might be due to:")
+            print("   - Outdated Nilearn version")
+            print("   - Missing atlas dependencies")
+            print("   - Import errors")
+            return False
+        
+        return True
+        
+    except ImportError:
+        print("❌ Nilearn not available")
+        return False
+    except Exception as e:
+        print(f"❌ Error checking Nilearn compatibility: {e}")
+        return False
+
 # =============================================================================
 # USAGE AND HELP FUNCTIONS
 # =============================================================================
@@ -658,7 +704,7 @@ def test_schaefer_2018_configuration():
 # ATLAS FETCHING FUNCTIONS
 # =============================================================================
 
-def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: logging.Logger) -> Tuple[image.Nifti1Image, Dict[int, str]]:
+def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: logging.Logger) -> Tuple[Any, Dict[int, str]]:
     """Fetch a built-in Nilearn atlas and return the image and network labels."""
     try:
         if atlas_name not in NILEARN_ATLASES:
@@ -667,6 +713,9 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
         atlas_info = NILEARN_ATLASES[atlas_name]
         fetch_func = atlas_info['function']
         
+        if fetch_func is None:
+            raise ValueError(f"Atlas function for {atlas_name} is not available in this Nilearn version")
+        
         # Merge default parameters with user parameters
         params = atlas_info['default_params'].copy()
         params.update(atlas_params)
@@ -674,10 +723,22 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
         logger.info(f"Fetching {atlas_name} atlas with parameters: {params}")
         
         # Fetch the atlas
-        atlas_data = fetch_func(**params)
+        try:
+            atlas_data = fetch_func(**params)
+        except Exception as e:
+            logger.error(f"Failed to fetch {atlas_name} atlas: {str(e)}")
+            logger.error("This might be due to:")
+            logger.error("1. Network connectivity issues")
+            logger.error("2. Insufficient disk space")
+            logger.error("3. Nilearn version compatibility")
+            raise
         
         # Load the atlas image
-        atlas_img = image.load_img(atlas_data['maps'])
+        try:
+            atlas_img = image.load_img(atlas_data['maps'])
+        except Exception as e:
+            logger.error(f"Failed to load atlas image: {str(e)}")
+            raise
         
         # Generate network labels
         network_labels = {}
@@ -781,8 +842,8 @@ def validate_atlas_params(atlas_name: str, atlas_params: Dict[str, Any]) -> Dict
         
         # Check if n_rois is divisible by yeo_networks
         if n_rois % yeo_networks != 0:
-            logger.warning(f"Warning: n_rois ({n_rois}) is not evenly divisible by yeo_networks ({yeo_networks})")
-            logger.warning(f"This may result in uneven distribution of ROIs across networks")
+            print(f"Warning: n_rois ({n_rois}) is not evenly divisible by yeo_networks ({yeo_networks})")
+            print(f"This may result in uneven distribution of ROIs across networks")
         
         # Validate that the combination is reasonable
         if n_rois < yeo_networks:
@@ -790,9 +851,9 @@ def validate_atlas_params(atlas_name: str, atlas_params: Dict[str, Any]) -> Dict
         
         # Check if network names are available for this configuration
         if 'network_names' in atlas_info and yeo_networks in atlas_info['network_names']:
-            logger.info(f"Using predefined network names for Schaefer 2018: {yeo_networks} networks")
+            print(f"Using predefined network names for Schaefer 2018: {yeo_networks} networks")
         else:
-            logger.warning(f"No predefined network names for Schaefer 2018 with {yeo_networks} networks")
+            print(f"No predefined network names for Schaefer 2018 with {yeo_networks} networks")
     
     return validated_params
 
@@ -976,12 +1037,12 @@ def extract_run_id(fmri_file: str) -> str:
 # =============================================================================
 
 def resample_to_atlas_space(
-    img: image.Nifti1Image,
-    target_img: image.Nifti1Image,
+    img: Any,
+    target_img: Any,
     output_path: str,
     interpolation: str = 'continuous',
     logger: logging.Logger = None
-) -> Optional[image.Nifti1Image]:
+) -> Optional[Any]:
     """Resample an image to the space of the target image."""
     try:
         # Validate input image
@@ -1056,9 +1117,9 @@ def process_confounds(confounds_file: str, logger: logging.Logger) -> Tuple[pd.D
 # =============================================================================
 
 def extract_time_series(
-    fmri_img: image.Nifti1Image,
-    atlas: image.Nifti1Image,
-    brain_mask: image.Nifti1Image,
+    fmri_img: Any,
+    atlas: Any,
+    brain_mask: Any,
     motion_params: pd.DataFrame,
     valid_timepoints: pd.Series,
     work_dir: str,
@@ -1252,8 +1313,8 @@ def compute_connectivity_measures(
 def process_run(
     fmri_file: str,
     confounds_file: str,
-    atlas: image.Nifti1Image,
-    brain_mask: str,
+    atlas: Any,
+    brain_mask: Any,
     output_prefix: str,
     work_dir: str,
     network_labels: Dict[int, str],
@@ -1420,6 +1481,11 @@ Run with --usage for detailed examples or --help for full help.
         action='store_true',
         help='Test the Schaefer 2018 atlas configuration'
     )
+    parser.add_argument(
+        '--check-compatibility',
+        action='store_true',
+        help='Check Nilearn version compatibility and atlas availability'
+    )
     
     return parser.parse_args()
 
@@ -1434,7 +1500,7 @@ def load_atlas_and_labels(
     label_pattern: str = 'power',
     custom_regex: str = None,
     logger: logging.Logger = None
-) -> Tuple[image.Nifti1Image, Dict[int, str], str]:
+) -> Tuple[Any, Dict[int, str], str]:
     """Load atlas and network labels, returning atlas image, network labels, and atlas name."""
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -1513,6 +1579,10 @@ def main():
     
     if args.test_schaefer:
         test_schaefer_2018_configuration()
+        return
+    
+    if args.check_compatibility:
+        check_nilearn_compatibility()
         return
 
     # Validate arguments
