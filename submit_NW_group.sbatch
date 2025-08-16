@@ -43,7 +43,7 @@
 #SBATCH --time=4:00:00
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=8
-#SBATCH --account=xxqian
+#SBATCH --account=def-jfeusner
 #SBATCH --mail-type=END
 #SBATCH --mail-user=xxqian@stanford.edu
 
