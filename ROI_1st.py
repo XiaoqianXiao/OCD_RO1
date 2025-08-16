@@ -118,11 +118,25 @@ from nilearn import image
 from nilearn.input_data import NiftiLabelsMasker
 from nilearn.image import resample_to_img
 from nilearn.datasets import (
+    load_mni152_template,
     fetch_atlas_schaefer_2018, fetch_atlas_harvard_oxford,
-    fetch_atlas_aal, fetch_atlas_talairach, fetch_atlas_power_2011,
+    fetch_atlas_aal, fetch_atlas_talairach,
     fetch_atlas_coords_power_2012, fetch_atlas_pauli_2017,
     fetch_atlas_yeo_2011
 )
+
+# Handle different Nilearn versions for image types
+try:
+    from nilearn.image import Nifti1Image
+except ImportError:
+    try:
+        # For older Nilearn versions
+        from nilearn.image import new_img_like
+        # Create a type alias for compatibility
+        Nifti1Image = type(new_img_like)
+    except ImportError:
+        # Fallback to generic type
+        Nifti1Image = object
 import argparse
 import logging
 from itertools import combinations
@@ -522,7 +536,7 @@ def print_available_atlases():
 # ATLAS FETCHING FUNCTIONS
 # =============================================================================
 
-def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: logging.Logger) -> Tuple[image.Nifti1Image, List[str]]:
+def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: logging.Logger) -> Tuple[Any, List[str]]:
     """Fetch a built-in Nilearn atlas and return the image and labels."""
     try:
         if atlas_name not in NILEARN_ATLASES:
@@ -733,7 +747,7 @@ Run with --usage for detailed examples or --help for full help.
 # ATLAS AND LABELS LOADING
 # =============================================================================
 
-def load_atlas(atlas_path: str, logger: logging.Logger) -> image.Nifti1Image:
+def load_atlas(atlas_path: str, logger: logging.Logger) -> Any:
     """Load atlas image from file."""
     logger.info(f"Loading atlas: {atlas_path}")
     
@@ -882,7 +896,7 @@ def load_atlas_and_labels(
     custom_regex: str = None,
     expected_rois: int = None,
     logger: logging.Logger = None
-) -> Tuple[image.Nifti1Image, List[str]]:
+) -> Tuple[Any, List[str]]:
     """Load atlas and ROI labels with validation."""
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -978,12 +992,12 @@ def extract_run_id(fmri_file: str) -> str:
 # =============================================================================
 
 def resample_to_atlas_space(
-    img: image.Nifti1Image,
-    target_img: image.Nifti1Image,
+    img: Any,
+    target_img: Any,
     output_path: str,
     interpolation: str = 'continuous',
     logger: logging.Logger = None
-) -> Optional[image.Nifti1Image]:
+) -> Optional[Any]:
     """Resample an image to the space of the target image."""
     try:
         # Validate input image
@@ -1058,9 +1072,9 @@ def process_confounds(confounds_file: str, logger: logging.Logger) -> Tuple[pd.D
 # =============================================================================
 
 def extract_time_series(
-    fmri_img: image.Nifti1Image,
-    atlas: image.Nifti1Image,
-    brain_mask: image.Nifti1Image,
+    fmri_img: Any,
+    atlas: Any,
+    brain_mask: Any,
     motion_params: pd.DataFrame,
     valid_timepoints: pd.Series,
     work_dir: str,
@@ -1147,7 +1161,7 @@ def compute_connectivity_measures(
 def process_run(
     fmri_file: str,
     confounds_file: str,
-    atlas: image.Nifti1Image,
+    atlas: Any,
     brain_mask: str,
     output_prefix: str,
     work_dir: str,

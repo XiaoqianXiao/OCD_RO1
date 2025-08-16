@@ -27,6 +27,19 @@ import warnings
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
+# Handle different Nilearn versions for image types
+try:
+    from nilearn.image import Nifti1Image
+except ImportError:
+    try:
+        # For older Nilearn versions
+        from nilearn.image import new_img_like
+        # Create a type alias for compatibility
+        Nifti1Image = type(new_img_like)
+    except ImportError:
+        # Fallback to generic type
+        Nifti1Image = object
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -216,11 +229,11 @@ def process_confounds(confounds_file: str, logger: logging.Logger) -> Tuple[pd.D
 # =============================================================================
 
 def extract_seed_time_series(
-    fmri_img: image.Nifti1Image,
-    seed_roi: image.Nifti1Image,
+    fmri_img: Any,
+    seed_roi: Any,
+    brain_mask: Any,
     motion_params: pd.DataFrame,
     valid_timepoints: pd.Series,
-    work_dir: str,
     logger: logging.Logger
 ) -> Optional[np.ndarray]:
     """Extract seed ROI time series using NiftiMasker."""
@@ -252,12 +265,11 @@ def extract_seed_time_series(
         logger.error(f"Failed to extract seed time series: {str(e)}")
         return None
 
-def extract_brain_time_series(
-    fmri_img: image.Nifti1Image,
-    brain_mask: image.Nifti1Image,
+def extract_voxel_time_series(
+    fmri_img: Any,
+    brain_mask: Any,
     motion_params: pd.DataFrame,
     valid_timepoints: pd.Series,
-    work_dir: str,
     logger: logging.Logger
 ) -> Optional[np.ndarray]:
     """Extract brain voxel time series using NiftiMasker."""
@@ -358,7 +370,7 @@ def process_run(
         # Extract seed time series
         logger.info("Extracting seed time series...")
         seed_time_series = extract_seed_time_series(
-            fmri_img, seed_roi, motion_params, valid_timepoints, work_dir, logger
+            fmri_img, seed_roi, brain_mask, motion_params, valid_timepoints, logger
         )
         
         if seed_time_series is None:
@@ -366,8 +378,8 @@ def process_run(
         
         # Extract brain time series
         logger.info("Extracting brain time series...")
-        brain_result = extract_brain_time_series(
-            fmri_img, brain_mask, motion_params, valid_timepoints, work_dir, logger
+        brain_result = extract_voxel_time_series(
+            fmri_img, brain_mask, motion_params, valid_timepoints, logger
         )
         
         if brain_result is None:

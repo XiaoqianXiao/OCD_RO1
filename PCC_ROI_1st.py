@@ -19,6 +19,19 @@ from nilearn import image
 from nilearn.input_data import NiftiLabelsMasker
 from nilearn.datasets import fetch_coords_power_2011, load_mni152_template
 from nilearn.image import resample_to_img
+
+# Handle different Nilearn versions for image types
+try:
+    from nilearn.image import Nifti1Image
+except ImportError:
+    try:
+        # For older Nilearn versions
+        from nilearn.image import new_img_like
+        # Create a type alias for compatibility
+        Nifti1Image = type(new_img_like)
+    except ImportError:
+        # Fallback to generic type
+        Nifti1Image = object
 import argparse
 import logging
 from itertools import combinations
@@ -300,12 +313,12 @@ def extract_run_id(fmri_file: str) -> str:
 # =============================================================================
 
 def resample_to_atlas_space(
-    img: image.Nifti1Image,
-    target_img: image.Nifti1Image,
+    img: Any,
+    target_img: Any,
     output_path: str,
     interpolation: str = 'continuous',
     logger: logging.Logger = None
-) -> Optional[image.Nifti1Image]:
+) -> Optional[Any]:
     """Resample an image to the space of the target image."""
     try:
         # Validate input image
@@ -380,21 +393,20 @@ def process_confounds(confounds_file: str, logger: logging.Logger) -> Tuple[pd.D
 # =============================================================================
 
 def extract_time_series(
-    fmri_img: image.Nifti1Image,
-    atlas: image.Nifti1Image,
-    brain_mask: image.Nifti1Image,
+    fmri_img: Any,
+    atlas: Any,
+    brain_mask: Any,
     motion_params: pd.DataFrame,
     valid_timepoints: pd.Series,
-    work_dir: str,
     logger: logging.Logger
-) -> Optional[np.ndarray]:
+) -> Tuple[np.ndarray, List[str]]:
     """Extract ROI time series using NiftiLabelsMasker."""
     try:
         masker = NiftiLabelsMasker(
             labels_img=atlas,
             mask_img=brain_mask,
             standardize='zscore',
-            memory=os.path.join(work_dir, 'nilearn_cache'),
+            memory=os.path.join(DEFAULT_CONFIG['work_dir'], 'nilearn_cache'),
             memory_level=1,
             detrend=True,
             low_pass=DEFAULT_CONFIG['low_pass'],
@@ -412,13 +424,16 @@ def extract_time_series(
         
         if time_series.shape[0] < DEFAULT_CONFIG['min_timepoints']:
             logger.error(f"Time series too short ({time_series.shape[0]} timepoints)")
-            return None
+            return None, []
         
-        return time_series
+        # Get ROI names from the masker
+        roi_names = masker.labels_
+        
+        return time_series, roi_names
         
     except Exception as e:
         logger.error(f"Failed to extract time series: {str(e)}")
-        return None
+        return None, []
 
 def compute_connectivity_measures(
     time_series: np.ndarray,
@@ -470,7 +485,7 @@ def compute_connectivity_measures(
 def process_run(
     fmri_file: str,
     confounds_file: str,
-    atlas: image.Nifti1Image,
+    atlas: Any,
     brain_mask: str,
     output_prefix: str,
     work_dir: str,
@@ -513,8 +528,8 @@ def process_run(
         
         # Extract time series
         logger.info("Extracting ROI time series...")
-        time_series = extract_time_series(
-            fmri_img, atlas, brain_mask_img, motion_params, valid_timepoints, work_dir, logger
+        time_series, roi_names = extract_time_series(
+            fmri_img, atlas, brain_mask_img, motion_params, valid_timepoints, logger
         )
         
         if time_series is None:
@@ -523,7 +538,7 @@ def process_run(
         # Compute connectivity measures
         logger.info("Computing connectivity measures...")
         network_labels = load_network_labels(DEFAULT_CONFIG['roi_dir'], time_series.shape[1], logger)
-        roi_names = [f"ROI_{i+1}" for i in range(time_series.shape[1] - 1)] + ['PCC']
+        # roi_names = [f"ROI_{i+1}" for i in range(time_series.shape[1] - 1)] + ['PCC'] # This line is no longer needed
         
         result = compute_connectivity_measures(
             time_series, network_labels, roi_names, output_prefix, logger
