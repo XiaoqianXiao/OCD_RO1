@@ -60,10 +60,10 @@ WORK_DIR="/scratch/xxqian/OCD/work"
 ROI_DIR="/scratch/xxqian/OCD/roi"
 
 # Default directories and files
-DEFAULT_INPUT_DIR="$BIDS_DIR/derivatives/NW_1st/FC"
+DEFAULT_INPUT_DIR="/scratch/xxqian/OCD"
 DEFAULT_OUTPUT_DIR="$OUTPUT_DIR"
-DEFAULT_SUBJECTS_CSV="$BIDS_DIR/group.csv"
-DEFAULT_CLINICAL_CSV="$BIDS_DIR/clinical.csv"
+DEFAULT_SUBJECTS_CSV="/project/6079231/dliang55/R01_AOCD/group.csv"
+DEFAULT_CLINICAL_CSV="/project/6079231/dliang55/R01_AOCD/clinical.csv"
 
 # Default analysis parameters
 DEFAULT_ATLAS_NAME=""
@@ -94,7 +94,7 @@ BASIC USAGE:
 OPTIONS:
   --help                    Show this help message
   --usage                   Show detailed usage examples
-  --input-dir DIR           Input directory (default: /project/6079231/dliang55/R01_AOCD/derivatives/NW_1st/FC)
+  --input-dir DIR           Input directory (default: /scratch/xxqian/OCD)
   --output-dir DIR          Output directory for results (default: /scratch/xxqian/OCD/NW_group)
           --subjects-csv FILE       Group metadata CSV file (default: /project/6079231/dliang55/R01_AOCD/group.csv)
         --clinical-csv FILE       Clinical data CSV file (default: /project/6079231/dliang55/R01_AOCD/clinical.csv)
@@ -152,7 +152,7 @@ DETAILED USAGE EXAMPLES
    sbatch submit_NW_group.sbatch
    
    This will:
-           - Use default input directory: /project/6079231/dliang55/R01_AOCD/derivatives/NW_1st/FC
+           - Use default input directory: /scratch/xxqian/OCD
         - Use default output directory: /scratch/xxqian/OCD/NW_group
    - Use default group and clinical CSV files
    - Use default atlas name (Power 2011)
