@@ -1,4 +1,68 @@
 #!/bin/bash
+
+# =============================================================================
+# SLURM Batch Job Script for NW_group.py
+# =============================================================================
+# 
+# This script runs ROI-to-network functional connectivity group analysis using
+# NW_group.py. It performs group-level statistical analysis on ROI-to-network
+# FC data, comparing healthy controls vs. OCD patients and performing
+# longitudinal analyses.
+#
+# USAGE:
+#   sbatch submit_NW_group.sbatch
+#
+# EXAMPLES:
+#   1. Run with default settings:
+#      sbatch submit_NW_group.sbatch
+#
+#   2. Check job status:
+#      squeue -u xxqian
+#
+#   3. Check job logs:
+#      tail -f /scratch/xxqian/logs/NWGroup_<JOB_ID>.out
+#
+#   4. Monitor job progress:
+#      watch -n 10 'squeue -u xxqian'
+#
+#   5. Check specific job details:
+#      scontrol show job <JOB_ID>
+#
+# REQUIRED FILES:
+# ---------------
+# - Container image: /scratch/xxqian/repo/image/OCD.sif
+# - Python script: /scratch/xxqian/repo/OCD_RO1/NW_group.py
+# - Input directory: /scratch/xxqian/OCD (FC data from NW_1st.py)
+# - Subjects CSV: /project/6079231/dliang55/R01_AOCD/metadata/shared_demographics.csv
+# - Clinical CSV: /scratch/xxqian/OCD/behav/clinical.csv
+#
+# OUTPUT:
+# -------
+# - Group difference analysis results
+# - Baseline FC vs symptom change regression
+# - FC change vs symptom change regression
+# - Statistical analysis reports
+# - Results saved to: /scratch/xxqian/OCD/NW_group
+#
+# SLURM RESOURCES:
+# ----------------
+# - Time: 01:00:00 (1 hour)
+# - Memory: 8G
+# - CPUs: 16
+# - Nodes: 1
+#
+# TROUBLESHOOTING:
+# ----------------
+# 1. Check that all required directories exist
+# 2. Verify CSV file formats and column names
+# 3. Ensure container image is accessible
+# 4. Check SLURM job status and logs
+# 5. Verify FC data files exist in input directory
+# 6. Check atlas naming consistency with NW_1st.py output
+#
+# For more information, see NW_group.py --help
+# =============================================================================
+
 #SBATCH --job-name=network_fc_group
 #SBATCH --output=/scratch/xxqian/logs/NWGroup_%A_%a.out
 #SBATCH --error=/scratch/xxqian/logs/NWGroup_%A_%a.err
@@ -39,10 +103,49 @@ done
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"
 
+# =============================================================================
+# USAGE INFORMATION
+# =============================================================================
+
+echo "=" * 80
+echo "NW_group.py Group Analysis Job"
+echo "=" * 80
+echo "Job Configuration:"
+echo "  Container: $CONTAINER"
+echo "  Input Directory: $INPUT_DIR"
+echo "  Output Directory: $OUTPUT_DIR"
+echo "  Subjects CSV: $SUBJECTS_CSV"
+echo "  Clinical CSV: $CLINICAL_CSV"
+echo "  Bind Paths: $APPTAINER_BIND"
+echo ""
+echo "Container Paths:"
+echo "  --subjects_csv: /metadata/shared_demographics.csv (maps to: $SUBJECTS_CSV)"
+echo "  --clinical_csv: /output/behav/clinical.csv (maps to: $CLINICAL_CSV)"
+echo "  --output_dir: /output/NW_group (maps to: $OUTPUT_DIR)"
+echo "  --input_dir: /input (maps to: $INPUT_DIR)"
+echo "=" * 80
+
 # Run the Python script inside the Apptainer container
+echo "Starting NW_group.py analysis..."
+echo "Command: python3 /app/NW_group.py --subjects_csv /metadata/shared_demographics.csv --clinical_csv /output/behav/clinical.csv --output_dir /output/NW_group --input_dir /input --auto-detect-atlas"
 apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_group.py \
     --subjects_csv /metadata/shared_demographics.csv \
     --clinical_csv /output/behav/clinical.csv \
     --output_dir /output/NW_group \
     --input_dir /input \
     --auto-detect-atlas
+
+# Check exit status
+exit_code=$?
+if [[ $exit_code -eq 0 ]]; then
+    echo "=" * 80
+    echo "Analysis completed successfully at: $(date)"
+    echo "Results saved to: $OUTPUT_DIR"
+    echo "=" * 80
+else
+    echo "=" * 80
+    echo "Analysis failed with exit code $exit_code at: $(date)"
+    echo "Check the error logs above for details"
+    echo "=" * 80
+    exit $exit_code
+fi
