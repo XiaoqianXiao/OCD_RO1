@@ -91,7 +91,7 @@ done
 
 # Define directories
 BIDS_DIR="/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1"
-OUTPUT_DIR="/scratch/xxqian/OCD"
+OUTPUT_DIR="/home/xxqian/scratch/OCD/NW_1st"
 LOG_DIR="/scratch/xxqian/logs"
 TEMP_JOB_DIR="/scratch/xxqian/slurm_jobs"
 

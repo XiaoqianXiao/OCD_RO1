@@ -32,7 +32,7 @@
 # ---------------
 # - Container image: /scratch/xxqian/repo/image/OCD.sif
 # - Python script: /scratch/xxqian/repo/OCD_RO1/NW_group.py
-# - Input directory: /scratch/xxqian/OCD (FC data from NW_1st.py)
+# - Input directory: /scratch/xxqian/OCD/NW_1st (FC data from NW_1st.py)
 # - Subjects CSV: /project/6079231/dliang55/R01_AOCD/metadata/shared_demographics.csv
 # - Clinical CSV: /scratch/xxqian/OCD/behav/clinical.csv
 #
@@ -87,7 +87,7 @@ SCRATCH_DIR="/scratch/xxqian"
 OUTPUT_DIR="${SCRATCH_DIR}/OCD/NW_group"
 SUBJECTS_CSV="${PROJECT_DIR}/metadata/shared_demographics.csv"
 CLINICAL_CSV="${SCRATCH_DIR}/OCD/behav/clinical.csv"
-INPUT_DIR="${SCRATCH_DIR}/OCD"
+INPUT_DIR="${SCRATCH_DIR}/OCD/NW_1st"
 
 # Bind directories
 APPTAINER_BIND="/scratch/xxqian/repo/OCD_RO1:/app, ${SCRATCH_DIR}/OCD:/output, ${PROJECT_DIR}/metadata:/metadata, ${INPUT_DIR}:/input"

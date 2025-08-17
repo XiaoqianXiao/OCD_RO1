@@ -191,7 +191,7 @@ CONFIG = {
     'project_dir': '/project/6079231/dliang55/R01_AOCD',
     'bids_dir': '/project/6079231/dliang55/R01_AOCD/derivatives/fmriprep-1.4.1',
     'scratch_dir': '/scratch/xxqian',
-    'output_dir': '/scratch/xxqian/OCD',
+    'output_dir': '/home/xxqian/scratch/OCD/NW_1st',
     'work_dir': '/scratch/xxqian/work_flow',
     'roi_dir': '/scratch/xxqian/roi',
     'log_file': '/scratch/xxqian/OCD/roi_to_roi_fc_analysis.log'
