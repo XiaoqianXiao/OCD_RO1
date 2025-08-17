@@ -62,8 +62,8 @@ ROI_DIR="/scratch/xxqian/OCD/roi"
 # Default directories and files
 DEFAULT_INPUT_DIR="/scratch/xxqian/OCD"
 DEFAULT_OUTPUT_DIR="$OUTPUT_DIR"
-DEFAULT_SUBJECTS_CSV="/project/6079231/dliang55/R01_AOCD/group.csv"
-DEFAULT_CLINICAL_CSV="/project/6079231/dliang55/R01_AOCD/clinical.csv"
+DEFAULT_SUBJECTS_CSV="/home/xxqian/scratch/OCD/behav/group.csv"
+DEFAULT_CLINICAL_CSV="/home/xxqian/scratch/OCD/behav/clinical.csv"
 
 # Default analysis parameters
 DEFAULT_ATLAS_NAME=""
@@ -96,8 +96,8 @@ OPTIONS:
   --usage                   Show detailed usage examples
   --input-dir DIR           Input directory (default: /scratch/xxqian/OCD)
   --output-dir DIR          Output directory for results (default: /scratch/xxqian/OCD/NW_group)
-          --subjects-csv FILE       Group metadata CSV file (default: /project/6079231/dliang55/R01_AOCD/group.csv)
-        --clinical-csv FILE       Clinical data CSV file (default: /project/6079231/dliang55/R01_AOCD/clinical.csv)
+          --subjects-csv FILE       Group metadata CSV file (default: /home/xxqian/scratch/OCD/behav/group.csv)
+        --clinical-csv FILE       Clinical data CSV file (default: /home/xxqian/scratch/OCD/behav/clinical.csv)
   --atlas-name NAME         Specific atlas name to use
   --auto-detect-atlas       Automatically detect atlas name from input files
   --verbose                 Enable verbose logging
