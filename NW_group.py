@@ -512,11 +512,16 @@ def run_regression(
         try:
             # Perform multiple linear regression with condition as confounder
             # Create formula for regression with condition confounder
-            formula = f"{feature} ~ y_values + condition"
+            # Sanitize feature name for formula (remove special characters)
+            safe_feature = f"feature_{feature.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')}"
             
-            # Prepare data for regression
+            # Prepare data for regression with sanitized column names
             regression_data = feature_data.copy()
             regression_data['y_values'] = y_values.loc[feature_data['subject_id']].values
+            regression_data[safe_feature] = regression_data[feature]
+            
+            # Create formula with sanitized names
+            formula = f"{safe_feature} ~ y_values + condition"
             
             # Fit the model
             model = ols(formula, data=regression_data).fit()
