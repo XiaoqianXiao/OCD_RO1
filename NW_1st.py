@@ -1215,17 +1215,11 @@ def process_confounds(confounds_file: str, logger: logging.Logger) -> Tuple[pd.D
         selected_cols = compcor_cols + available_motion
         motion_params = confounds_df[selected_cols].fillna(0) if selected_cols else pd.DataFrame(index=confounds_df.index)
         
-        # Create motion flags
-        if 'framewise_displacement' in confounds_df.columns:
-            fd_flags = confounds_df['framewise_displacement'].fillna(0) > ANALYSIS_PARAMS['fd_threshold']
-        else:
-            logger.warning("No framewise_displacement column found, assuming no excessive motion")
-            fd_flags = pd.Series([False] * len(confounds_df))
-        
-        valid_timepoints = ~fd_flags
+        # Use all timepoints (no motion filtering)
+        valid_timepoints = pd.Series([True] * len(confounds_df))
         
         logger.info(f"Confounds processed: {len(compcor_cols)} aCompCor, {len(available_motion)} motion parameters")
-        logger.info(f"Valid timepoints: {valid_timepoints.sum()}/{len(valid_timepoints)}")
+        logger.info(f"Using all {len(valid_timepoints)} timepoints")
         
         return motion_params, valid_timepoints
         
@@ -1248,6 +1242,10 @@ def extract_time_series(
 ) -> Optional[np.ndarray]:
     """Extract ROI time series using NiftiLabelsMasker."""
     try:
+        # Use all timepoints with confound regression
+        logger.info(f"Using all {len(valid_timepoints)} timepoints with confound regression")
+        
+        # Create masker with confounds for direct regression
         masker = NiftiLabelsMasker(
             labels_img=atlas,
             mask_img=brain_mask,
@@ -1258,13 +1256,12 @@ def extract_time_series(
             low_pass=ANALYSIS_PARAMS['low_pass'],
             high_pass=ANALYSIS_PARAMS['high_pass'],
             t_r=ANALYSIS_PARAMS['tr'],
-            confounds=motion_params[valid_timepoints] if not motion_params.empty else None
+            confounds=motion_params if not motion_params.empty else None
         )
         
-        time_series = masker.fit_transform(
-            fmri_img,
-            confounds=motion_params[valid_timepoints] if not motion_params.empty else None
-        )
+        # Extract time series with confound regression applied
+        time_series = masker.fit_transform(fmri_img)
+        logger.info(f"Time series shape: {time_series.shape}")
         
         logger.info(f"Extracted time series with shape: {time_series.shape}")
         
@@ -1472,9 +1469,8 @@ def process_run(
         logger.info("Processing confounds...")
         motion_params, valid_timepoints = process_confounds(confounds_file, logger)
         
-        if valid_timepoints.sum() < ANALYSIS_PARAMS['min_timepoints']:
-            logger.error(f"Too few valid timepoints ({valid_timepoints.sum()})")
-            return None
+        # No need to check minimum timepoints since we're using all data
+        logger.info(f"Processing with {len(valid_timepoints)} timepoints")
         
         # Extract time series
         logger.info("Extracting ROI time series...")
