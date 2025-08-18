@@ -100,7 +100,7 @@ import re
 import json
 import numpy as np
 import pandas as pd
-from nilearn import image
+from nilearn import image, signal
 from nilearn.input_data import NiftiLabelsMasker
 # Nilearn atlas imports with version compatibility
 try:
@@ -1215,13 +1215,27 @@ def process_confounds(confounds_file: str, logger: logging.Logger) -> Tuple[pd.D
         selected_cols = compcor_cols + available_motion
         motion_params = confounds_df[selected_cols].fillna(0) if selected_cols else pd.DataFrame(index=confounds_df.index)
         
-        # Use all timepoints (no motion filtering)
-        valid_timepoints = pd.Series([True] * len(confounds_df))
+        # Create motion flags for censoring
+        if 'framewise_displacement' in confounds_df.columns:
+            fd_flags = confounds_df['framewise_displacement'].fillna(0) > ANALYSIS_PARAMS['fd_threshold']
+            high_motion_volumes = fd_flags.sum()
+            logger.info(f"Found {high_motion_volumes} high-motion volumes (FD > {ANALYSIS_PARAMS['fd_threshold']}mm)")
+        else:
+            logger.warning("No framewise_displacement column found, assuming no excessive motion")
+            fd_flags = pd.Series([False] * len(confounds_df))
+            high_motion_volumes = 0
+        
+        # Create valid timepoints mask (True = keep, False = censor)
+        valid_timepoints = ~fd_flags
+        
+        # Create censored confounds in memory (don't save to file)
+        censored_motion_params = motion_params[valid_timepoints].copy()
         
         logger.info(f"Confounds processed: {len(compcor_cols)} aCompCor, {len(available_motion)} motion parameters")
-        logger.info(f"Using all {len(valid_timepoints)} timepoints")
+        logger.info(f"Motion censoring: {valid_timepoints.sum()}/{len(valid_timepoints)} volumes kept after censoring")
+        logger.info(f"Note: Original confounds file unchanged - censoring applied only in memory")
         
-        return motion_params, valid_timepoints
+        return censored_motion_params, valid_timepoints
         
     except Exception as e:
         logger.error(f"Failed to process confounds: {str(e)}")
@@ -1240,13 +1254,12 @@ def extract_time_series(
     work_dir: str,
     logger: logging.Logger
 ) -> Optional[np.ndarray]:
-    """Extract ROI time series using NiftiLabelsMasker."""
+    """Extract ROI time series using NiftiLabelsMasker with motion censoring."""
     try:
-        # Use all timepoints with confound regression
-        logger.info(f"Using all {len(valid_timepoints)} timepoints with confound regression")
+        # Step 1: Extract full time series without confounds
+        logger.info(f"Step 1: Extracting full time series ({len(valid_timepoints)} total volumes)")
         
-        # Create masker with confounds for direct regression
-        masker = NiftiLabelsMasker(
+        masker_no_confounds = NiftiLabelsMasker(
             labels_img=atlas,
             mask_img=brain_mask,
             standardize='zscore',
@@ -1256,12 +1269,39 @@ def extract_time_series(
             low_pass=ANALYSIS_PARAMS['low_pass'],
             high_pass=ANALYSIS_PARAMS['high_pass'],
             t_r=ANALYSIS_PARAMS['tr'],
-            confounds=motion_params if not motion_params.empty else None
+            confounds=None  # No confounds for initial extraction
         )
         
-        # Extract time series with confound regression applied
-        time_series = masker.fit_transform(fmri_img)
-        logger.info(f"Time series shape: {time_series.shape}")
+        # Extract full time series
+        full_time_series = masker_no_confounds.fit_transform(fmri_img)
+        logger.info(f"Full time series shape: {full_time_series.shape}")
+        
+        # Step 2: Censor high-motion volumes from BOLD data
+        logger.info(f"Step 2: Censoring high-motion volumes")
+        censored_time_series = full_time_series[valid_timepoints]
+        logger.info(f"Censored time series shape: {censored_time_series.shape}")
+        
+        # Step 3: Apply confound regression to censored data
+        logger.info(f"Step 3: Applying confound regression to censored data")
+        if not motion_params.empty:
+            # Use nilearn's signal.clean for confound regression
+            from nilearn import signal
+            cleaned_time_series = signal.clean(
+                censored_time_series,
+                confounds=motion_params,
+                detrend=True,
+                standardize='zscore',
+                low_pass=ANALYSIS_PARAMS['low_pass'],
+                high_pass=ANALYSIS_PARAMS['high_pass'],
+                t_r=ANALYSIS_PARAMS['tr']
+            )
+            time_series = cleaned_time_series
+            logger.info(f"Confound regression completed")
+        else:
+            time_series = censored_time_series
+            logger.info(f"No confounds to regress")
+        
+        logger.info(f"Final time series shape: {time_series.shape}")
         
         logger.info(f"Extracted time series with shape: {time_series.shape}")
         
@@ -1465,12 +1505,16 @@ def process_run(
         if brain_mask_img is None:
             return None
         
-        # Process confounds
-        logger.info("Processing confounds...")
+        # Process confounds (motion censoring applied in memory only)
+        logger.info("Processing confounds with motion censoring...")
         motion_params, valid_timepoints = process_confounds(confounds_file, logger)
         
-        # No need to check minimum timepoints since we're using all data
-        logger.info(f"Processing with {len(valid_timepoints)} timepoints")
+        # Check if we have enough timepoints after censoring
+        if valid_timepoints.sum() < ANALYSIS_PARAMS['min_timepoints']:
+            logger.error(f"Too few timepoints after censoring ({valid_timepoints.sum()})")
+            return None
+        
+        logger.info(f"Processing with {valid_timepoints.sum()}/{len(valid_timepoints)} timepoints (after censoring)")
         
         # Extract time series
         logger.info("Extracting ROI time series...")
