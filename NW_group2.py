@@ -85,6 +85,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from statsmodels.stats.multitest import fdrcorrection
+from statsmodels.formula.api import ols
 import argparse
 import logging
 from pathlib import Path
@@ -399,10 +400,15 @@ def run_regression(
     fc_data: pd.DataFrame, 
     y_values: pd.Series, 
     feature_columns: List[str],
+    analysis_name: str,
+    metadata_df: pd.DataFrame,
     logger: logging.Logger
 ) -> pd.DataFrame:
-    """Run linear regression with FDR correction for network-level FC."""
-    logger.info("Running regressions for %d features", len(feature_columns))
+    """Run linear regression with condition confounder and FDR correction for network-level FC."""
+    logger.info(
+        "Running %s regression with condition confounder for %d subjects and %d network-level features",
+        analysis_name, len(fc_data), len(feature_columns)
+    )
     
     results = []
     dropped_features = []
@@ -413,67 +419,176 @@ def run_regression(
     
     # Find common subjects
     common_subjects = fc_data.index.intersection(y_values.index)
-    logger.debug("Common subjects for regression: %d", len(common_subjects))
+    logger.debug(
+        "Common subjects for %s regression: %d (%s)", 
+        analysis_name, len(common_subjects), list(common_subjects)
+    )
     
     if not common_subjects.size:
-        logger.warning("No common subjects for regression")
+        logger.warning(
+            "No common subjects for %s regression. FC subjects: %s, YBOCS subjects: %s",
+            analysis_name, list(fc_data.index), list(y_values.index)
+        )
         return pd.DataFrame()
     
     # Filter data to common subjects
     fc_data = fc_data.loc[common_subjects]
     y_values = y_values.loc[common_subjects]
+    
+    # Add condition information for OCD subjects
+    fc_data_with_condition = fc_data.reset_index()
+    fc_data_with_condition = fc_data_with_condition.merge(
+        metadata_df[['subject_id', 'condition']], 
+        left_on='subject_id', 
+        right_on='subject_id', 
+        how='left'
+    )
+    
+    # Fill missing conditions
+    fc_data_with_condition['condition'] = fc_data_with_condition['condition'].fillna('unknown')
+    
+    logger.info("Condition distribution in %s regression: %s", 
+                analysis_name, fc_data_with_condition['condition'].value_counts().to_dict())
+    
+    dropped_subjects = [sid for sid in fc_data.index if sid not in y_values.index]
+    if dropped_subjects:
+        logger.info(
+            "Dropped %d subjects from %s regression due to missing YBOCS data: %s",
+            len(dropped_subjects), analysis_name, dropped_subjects
+        )
 
     # Run regression for each feature
     for col in feature_columns:
         x = fc_data[col].dropna()
         if x.empty:
-            logger.warning("Skipping feature %s due to empty data", col)
+            logger.warning(
+                "Skipping feature %s in %s regression due to empty data",
+                col, analysis_name
+            )
             dropped_features.append((col, "empty data"))
             continue
         
         y = y_values.loc[x.index].dropna()
-        logger.debug("Feature %s: n=%d", col, len(x))
+        logger.debug(
+            "Feature %s in %s regression: n=%d", 
+            col, analysis_name, len(y)
+        )
         
         if len(x) < DEFAULT_CONFIG['min_subjects_per_group'] or \
            len(y) < DEFAULT_CONFIG['min_subjects_per_group']:
             logger.warning(
-                "Skipping feature %s due to insufficient data (n=%d)", 
-                col, len(x)
+                "Skipping feature %s in %s regression due to insufficient data (n=%d)",
+                col, analysis_name, len(y)
             )
-            dropped_features.append((col, f"n={len(x)}"))
+            dropped_features.append((col, f"n={len(y)}"))
             continue
         
-        # Perform linear regression
-        x = x.values.reshape(-1, 1)
-        y = y.values
-        slope, intercept, r_value, p_val, _ = stats.linregress(x.flatten(), y)
+        # Get condition data for this feature
+        feature_data = fc_data_with_condition[['subject_id', col, 'condition']].dropna()
         
-        results.append({
-            'Feature': col,
-            'slope': slope,
-            'intercept': intercept,
-            'r_value': r_value,
-            'p_value': p_val,
-            'n': len(x)
-        })
+        if len(feature_data) < DEFAULT_CONFIG['min_subjects_per_group']:
+            logger.warning(
+                "Skipping feature %s in %s regression due to insufficient data (n=%d)",
+                col, analysis_name, len(feature_data)
+            )
+            dropped_features.append((col, f"n={len(feature_data)}"))
+            continue
+        
+        try:
+            # Perform multiple linear regression with condition as confounder
+            # Create formula for regression with condition confounder
+            # Sanitize feature name for formula (remove special characters)
+            safe_feature = f"feature_{col.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')}"
+            
+            # Prepare data for regression with sanitized column names
+            regression_data = feature_data.copy()
+            regression_data['y_values'] = y_values.loc[feature_data['subject_id']].values
+            regression_data[safe_feature] = regression_data[col]
+            
+            # Create formula with sanitized names
+            formula = f"{safe_feature} ~ y_values + condition"
+            
+            # Fit the model
+            model = ols(formula, data=regression_data).fit()
+            
+            # Get FC effect (slope)
+            fc_effect = model.params.get('y_values', 0)
+            fc_pval = model.pvalues.get('y_values', 1.0)
+            
+            # Get condition effects
+            condition_effects = {}
+            condition_pvals = {}
+            for cond in feature_data['condition'].unique():
+                if cond != feature_data['condition'].iloc[0]:  # Reference condition
+                    cond_param = f"condition[T.{cond}]"
+                    condition_effects[cond] = model.params.get(cond_param, 0)
+                    condition_pvals[cond] = model.pvalues.get(cond_param, 1.0)
+            
+            # Calculate correlation for backward compatibility
+            x = feature_data[col].values
+            y_vals = regression_data['y_values'].values
+            r_value = np.corrcoef(x, y_vals)[0, 1] if len(x) > 1 else 0
+            
+            results.append({
+                'Feature': col,
+                'fc_effect': fc_effect,  # Effect of FC on outcome
+                'fc_p_value': fc_pval,
+                'r_value': r_value,
+                'n': len(feature_data),
+                'condition_effects': condition_effects,
+                'condition_p_values': condition_pvals,
+                'model_r_squared': model.rsquared,
+                'model_adj_r_squared': model.rsquared_adj
+            })
+            
+        except Exception as e:
+            logger.warning(
+                "Failed to run regression with condition confounder for feature %s: %s",
+                col, e
+            )
+            # Fallback to simple regression
+            x = feature_data[col].values.reshape(-1, 1)
+            y_vals = y_values.loc[feature_data['subject_id']].values
+            slope, intercept, r_value, p_val, _ = stats.linregress(x.flatten(), y_vals)
+            
+            results.append({
+                'Feature': col,
+                'slope': slope,
+                'intercept': intercept,
+                'r_value': r_value,
+                'p_value': p_val,
+                'n': len(y_vals)
+            })
     
     if dropped_features:
         logger.info(
-            "Dropped %d features due to insufficient data: %s", 
-            len(dropped_features), dropped_features
+            "Dropped %d features in %s regression due to insufficient data: %s",
+            len(dropped_features), analysis_name, dropped_features
         )
     
     if not results:
-        logger.info("No regression results generated (no valid features)")
+        logger.info("No %s regression results generated (no valid features)", analysis_name)
         return pd.DataFrame()
     
     # Create results DataFrame and apply FDR correction
     results_df = pd.DataFrame(results)
-    p_vals = results_df['p_value'].values
-    _, p_vals_corr = fdrcorrection(p_vals, alpha=DEFAULT_CONFIG['fdr_alpha'])
-    results_df['p_value_fdr'] = p_vals_corr
     
-    logger.info("Generated regression results for %d features", len(results_df))
+    # Handle different p-value fields based on analysis type
+    if 'fc_p_value' in results_df.columns:
+        # New format with condition confounder
+        p_vals = results_df['fc_p_value'].values
+        _, p_vals_corr = fdrcorrection(p_vals, alpha=DEFAULT_CONFIG['fdr_alpha'])
+        results_df['fc_p_value_fdr'] = p_vals_corr
+    else:
+        # Fallback format
+        p_vals = results_df['p_value'].values
+        _, p_vals_corr = fdrcorrection(p_vals, alpha=DEFAULT_CONFIG['fdr_alpha'])
+        results_df['p_value_fdr'] = p_vals_corr
+    
+    logger.info(
+        "Generated %s regression results for %d features with %d subjects",
+        analysis_name, len(results_df), len(common_subjects)
+    )
     
     return results_df
 
@@ -486,7 +601,7 @@ def load_and_validate_metadata(
     clinical_csv: str, 
     logger: logging.Logger
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Load and validate metadata CSVs."""
+    """Load and validate metadata CSVs including condition information."""
     logger.info("Loading metadata from %s and %s", subjects_csv, clinical_csv)
     
     try:
@@ -505,6 +620,24 @@ def load_and_validate_metadata(
     except Exception as e:
         logger.error("Failed to load clinical CSV: %s", e)
         raise ValueError(f"Failed to load clinical CSV: {e}")
+
+    # Load condition information from shared_demographics.csv
+    try:
+        # The subjects_csv IS the shared_demographics.csv file, so condition info is already there
+        if 'condition' in df.columns:
+            # Fill missing conditions with 'unknown' for HC subjects, keep actual values for OCD subjects
+            df.loc[df['group'] == 'HC', 'condition'] = 'unknown'
+            df.loc[df['group'] == 'OCD', 'condition'] = df.loc[df['group'] == 'OCD', 'condition'].fillna('unknown')
+            
+            logger.info("Loaded condition information from subjects CSV")
+            logger.info("Condition distribution: %s", df['condition'].value_counts().to_dict())
+        else:
+            logger.warning("No 'condition' column found in subjects CSV. Adding default condition column.")
+            df['condition'] = 'unknown'
+            
+    except Exception as e:
+        logger.warning("Failed to load condition information: %s. Adding default condition column.", e)
+        df['condition'] = 'unknown'
 
     return df, df_clinical
 
@@ -726,6 +859,8 @@ def perform_longitudinal_analysis(
             baseline_fc_ocd.set_index('subject_id'),
             ocd_df.set_index('subject_id')['delta_ybocs'],
             feature_columns,
+            "baseline FC vs delta YBOCS",
+            df,
             logger
         )
         
@@ -805,6 +940,8 @@ def perform_longitudinal_analysis(
             fc_change_data.set_index('subject_id'),
             ocd_df.set_index('subject_id')['delta_ybocs'],
             feature_columns,
+            "delta FC vs delta YBOCS",
+            df,
             logger
         )
         
@@ -816,6 +953,253 @@ def perform_longitudinal_analysis(
             logger.info("No significant FC change regression results to save")
     else:
         logger.warning("No FC change data loaded for longitudinal analysis")
+
+# =============================================================================
+# CONDITION-BASED ANALYSIS FUNCTIONS
+# =============================================================================
+
+def perform_condition_analysis(
+    baseline_fc_data: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    valid_longitudinal: List[str],
+    input_dir: str,
+    output_dir: str,
+    atlas_name: str,
+    logger: logging.Logger
+) -> None:
+    """Perform condition-based analysis for OCD subjects only."""
+    logger.info("Performing condition-based analysis for atlas: %s", atlas_name)
+    
+    # Filter for OCD subjects only
+    ocd_baseline_fc = baseline_fc_data[
+        baseline_fc_data['subject_id'].isin(metadata_df[metadata_df['group'] == 'OCD']['subject_id'])
+    ]
+    
+    if ocd_baseline_fc.empty:
+        logger.warning("No baseline FC data for OCD subjects in condition analysis")
+        return
+    
+    # Get unique conditions (excluding 'unknown')
+    conditions = metadata_df[metadata_df['group'] == 'OCD']['condition'].unique()
+    conditions = [c for c in conditions if c != 'unknown']
+    
+    if len(conditions) < 2:
+        logger.warning("Need at least 2 conditions for comparison. Found: %s", conditions)
+        return
+    
+    logger.info("Analyzing conditions: %s", conditions)
+    
+    # 1. Baseline FC differences between conditions
+    logger.info("1. Analyzing baseline FC differences between conditions")
+    baseline_condition_results = run_condition_ttest(
+        ocd_baseline_fc, conditions, metadata_df, "baseline FC", logger
+    )
+    
+    if not baseline_condition_results.empty:
+        output_path = os.path.join(output_dir, f'condition_baseline_FC_{atlas_name}_network_fc.csv')
+        baseline_condition_results.to_csv(output_path, index=False)
+        logger.info("Saved baseline condition analysis to %s", output_path)
+    
+    # 2. Followup FC differences between conditions
+    logger.info("2. Analyzing followup FC differences between conditions")
+    followup_condition_results = analyze_followup_by_condition(
+        valid_longitudinal, input_dir, atlas_name, conditions, metadata_df, logger
+    )
+    
+    if not followup_condition_results.empty:
+        output_path = os.path.join(output_dir, f'condition_followup_FC_{atlas_name}_network_fc.csv')
+        followup_condition_results.to_csv(output_path, index=False)
+        logger.info("Saved followup condition analysis to %s", output_path)
+    
+    # 3. FC change differences between conditions
+    logger.info("3. Analyzing FC change differences between conditions")
+    change_condition_results = analyze_fc_change_by_condition(
+        valid_longitudinal, input_dir, atlas_name, conditions, metadata_df, logger
+    )
+    
+    if not change_condition_results.empty:
+        output_path = os.path.join(output_dir, f'condition_FC_change_{atlas_name}_network_fc.csv')
+        change_condition_results.to_csv(output_path, index=False)
+        logger.info("Saved FC change condition analysis to %s", output_path)
+    
+    logger.info("Condition-based analysis completed for atlas: %s", atlas_name)
+
+def run_condition_ttest(
+    fc_data: pd.DataFrame,
+    conditions: List[str],
+    metadata_df: pd.DataFrame,
+    analysis_type: str,
+    logger: logging.Logger
+) -> pd.DataFrame:
+    """Run t-tests between conditions for a given FC dataset."""
+    logger.info("Running condition t-tests for %s", analysis_type)
+    
+    results = []
+    reference_condition = conditions[0]
+    
+    for col in fc_data.columns:
+        if col == 'subject_id':
+            continue
+            
+        # Get data for each condition
+        condition_data = {}
+        for cond in conditions:
+            cond_subjects = metadata_df[
+                (metadata_df['group'] == 'OCD') & 
+                (metadata_df['condition'] == cond)
+            ]['subject_id']
+            cond_fc = fc_data[fc_data['subject_id'].isin(cond_subjects)][col].dropna()
+            condition_data[cond] = cond_fc
+        
+        # Skip if insufficient data
+        if any(len(data) < DEFAULT_CONFIG['min_subjects_per_group'] for data in condition_data.values()):
+            continue
+        
+        # Perform t-tests between reference condition and others
+        for cond in conditions[1:]:
+            try:
+                t_stat, p_val = stats.ttest_ind(
+                    condition_data[cond], 
+                    condition_data[reference_condition], 
+                    equal_var=False
+                )
+                
+                # Calculate effect size (Cohen's d)
+                pooled_std = np.sqrt(
+                    ((len(condition_data[cond]) - 1) * condition_data[cond].var() + 
+                     (len(condition_data[reference_condition]) - 1) * condition_data[reference_condition].var()) /
+                    (len(condition_data[cond]) + len(condition_data[reference_condition]) - 2)
+                )
+                effect_size = (condition_data[cond].mean() - condition_data[reference_condition].mean()) / pooled_std
+                
+                results.append({
+                    'Feature': col,
+                    'condition1': reference_condition,
+                    'condition2': cond,
+                    't_statistic': t_stat,
+                    'p_value': p_val,
+                    'condition1_mean': condition_data[reference_condition].mean(),
+                    'condition2_mean': condition_data[cond].mean(),
+                    'condition1_n': len(condition_data[reference_condition]),
+                    'condition2_n': len(condition_data[cond]),
+                    'effect_size': effect_size
+                })
+                
+            except Exception as e:
+                logger.warning("Failed to run t-test for feature %s, conditions %s vs %s: %s", 
+                             col, reference_condition, cond, e)
+                continue
+    
+    if not results:
+        logger.warning("No condition t-test results generated")
+        return pd.DataFrame()
+    
+    # Create results DataFrame and apply FDR correction
+    results_df = pd.DataFrame(results)
+    p_vals = results_df['p_value'].values
+    _, p_vals_corr = fdrcorrection(p_vals, alpha=DEFAULT_CONFIG['fdr_alpha'])
+    results_df['p_value_fdr'] = p_vals_corr
+    
+    logger.info("Generated condition t-test results for %d comparisons", len(results_df))
+    return results_df
+
+def analyze_followup_by_condition(
+    valid_longitudinal: List[str],
+    input_dir: str,
+    atlas_name: str,
+    conditions: List[str],
+    metadata_df: pd.DataFrame,
+    logger: logging.Logger
+) -> pd.DataFrame:
+    """Load followup FC data for OCD subjects and analyze by condition."""
+    logger.info("Analyzing followup FC by condition")
+    
+    fc_data = []
+    for sid in valid_longitudinal:
+        sid_clean = sid.replace('sub-', '')
+        fc_path = get_network_fc_path(sid_clean, 'ses-followup', input_dir, atlas_name)
+        
+        if not os.path.exists(fc_path):
+            continue
+            
+        try:
+            fc_df = pd.read_csv(fc_path)
+            fc_df['feature_id'] = fc_df.apply(
+                lambda x: '_'.join(sorted([x['network1'], x['network2']])) + '_fc', 
+                axis=1
+            )
+            
+            fc_pivot = fc_df.pivot_table(
+                index=None, columns='feature_id', values='fc_value'
+            ).reset_index(drop=True)
+            fc_pivot['subject_id'] = sid_clean
+            fc_data.append(fc_pivot)
+            
+        except Exception as e:
+            logger.error("Failed to process followup FC for subject %s: %s", sid, e)
+            continue
+    
+    if not fc_data:
+        logger.warning("No followup FC data loaded for condition analysis")
+        return pd.DataFrame()
+    
+    fc_data_df = pd.concat(fc_data, ignore_index=True)
+    return run_condition_ttest(fc_data_df, conditions, metadata_df, "followup FC", logger)
+
+def analyze_fc_change_by_condition(
+    valid_longitudinal: List[str],
+    input_dir: str,
+    atlas_name: str,
+    conditions: List[str],
+    metadata_df: pd.DataFrame,
+    logger: logging.Logger
+) -> pd.DataFrame:
+    """Load baseline and followup FC data, compute change, and analyze by condition."""
+    logger.info("Analyzing FC change by condition")
+    
+    fc_change_data = []
+    for sid in valid_longitudinal:
+        sid_clean = sid.replace('sub-', '')
+        base_path = get_network_fc_path(sid_clean, 'ses-baseline', input_dir, atlas_name)
+        follow_path = get_network_fc_path(sid_clean, 'ses-followup', input_dir, atlas_name)
+        
+        if not (os.path.exists(base_path) and os.path.exists(follow_path)):
+            continue
+            
+        try:
+            base_fc = pd.read_csv(base_path)
+            follow_fc = pd.read_csv(follow_path)
+            
+            base_fc['feature_id'] = base_fc.apply(
+                lambda x: '_'.join(sorted([x['network1'], x['network2']])) + '_fc', 
+                axis=1
+            )
+            follow_fc['feature_id'] = follow_fc.apply(
+                lambda x: '_'.join(sorted([x['network1'], x['network2']])) + '_fc', 
+                axis=1
+            )
+            
+            base_pivot = base_fc.pivot_table(
+                index=None, columns='feature_id', values='fc_value'
+            ).reset_index(drop=True)
+            follow_pivot = follow_fc.pivot_table(
+                index=None, columns='feature_id', values='fc_value'
+            ).reset_index(drop=True)
+            
+            change_pivot = follow_pivot - base_pivot
+            change_pivot['subject_id'] = sid_clean
+            fc_change_data.append(change_pivot)
+            
+        except Exception as e:
+            logger.error("Failed to process FC change for subject %s: %s", sid, e)
+            continue
+    
+    if not fc_change_data:
+        logger.warning("No FC change data loaded for condition analysis")
+        return pd.DataFrame()
+    
+    fc_change_df = pd.concat(fc_change_data, ignore_index=True)
+    return run_condition_ttest(fc_change_df, conditions, metadata_df, "FC change", logger)
 
 # =============================================================================
 # MAIN EXECUTION
@@ -894,7 +1278,15 @@ def main():
                 feature_columns, args.input_dir, args.output_dir, atlas_name, logger
             )
 
+        # 3. Condition-based analysis (Test 4)
+        if valid_group:
+            perform_condition_analysis(
+                baseline_fc_data, df, valid_longitudinal, 
+                args.input_dir, args.output_dir, atlas_name, logger
+            )
+
         logger.info("Main analysis completed successfully for atlas: %s", atlas_name)
+        logger.info("Analyses completed: Group comparison, Longitudinal analysis, Condition-based analysis")
     
     except Exception as e:
         logger.error("Main execution failed: %s", e)
@@ -1017,6 +1409,9 @@ OUTPUT FILES:
 - group_diff_baseline_{atlas_name}_network_fc.csv: Group difference t-test results
 - baselineFC_vs_deltaYBOCS_{atlas_name}_network_fc.csv: Baseline FC vs symptom change
 - deltaFC_vs_deltaYBOCS_{atlas_name}_network_fc.csv: FC change vs symptom change
+- condition_baseline_FC_{atlas_name}_network_fc.csv: Condition differences in baseline FC
+- condition_followup_FC_{atlas_name}_network_fc.csv: Condition differences in followup FC
+- condition_FC_change_{atlas_name}_network_fc.csv: Condition differences in FC change
 
 ATLAS NAMING CONVENTIONS:
 -------------------------
