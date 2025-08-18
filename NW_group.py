@@ -355,96 +355,38 @@ def run_ttest(
     results = []
     dropped_features = []
     
-    # Prepare data for ANCOVA
-    all_fc_data = pd.concat([fc_data_hc, fc_data_ocd], ignore_index=True)
-    
-    # Add group and condition information
-    all_fc_data['group'] = ['HC'] * len(fc_data_hc) + ['OCD'] * len(fc_data_ocd)
-    
-    # Merge with metadata to get condition information
-    all_fc_data = all_fc_data.merge(
-        metadata_df[['subject_id', 'condition']], 
-        on='subject_id', 
-        how='left'
-    )
-    
-    # Fill missing conditions
-    all_fc_data['condition'] = all_fc_data['condition'].fillna('unknown')
-    
-    logger.info("Condition distribution in analysis: %s", all_fc_data['condition'].value_counts().to_dict())
-    
     for feature, (net1, net2) in feature_info.items():
-        # Get data for this feature
-        feature_data = all_fc_data[['subject_id', 'group', 'condition', feature]].dropna()
+        hc_values = fc_data_hc[feature].dropna()
+        ocd_values = fc_data_ocd[feature].dropna()
         
-        if len(feature_data) < DEFAULT_CONFIG['min_subjects_per_group'] * 2:
+        logger.debug(
+            "Feature %s (%s_%s): HC n=%d, OCD n=%d", 
+            feature, net1, net2, len(hc_values), len(ocd_values)
+        )
+        
+        if len(hc_values) < DEFAULT_CONFIG['min_subjects_per_group'] or \
+           len(ocd_values) < DEFAULT_CONFIG['min_subjects_per_group']:
             logger.warning(
-                "Skipping feature %s (%s_%s) due to insufficient data (n=%d)",
-                feature, net1, net2, len(feature_data)
+                "Skipping feature %s (%s_%s) due to insufficient data (HC n=%d, OCD n=%d)",
+                feature, net1, net2, len(hc_values), len(ocd_values)
             )
-            dropped_features.append((feature, f"n={len(feature_data)}"))
+            dropped_features.append((feature, f"HC n={len(hc_values)}, OCD n={len(ocd_values)}"))
             continue
         
-        # Check if we have enough subjects per group
-        hc_count = len(feature_data[feature_data['group'] == 'HC'])
-        ocd_count = len(feature_data[feature_data['group'] == 'OCD'])
+        # Perform t-test
+        t_stat, p_val = stats.ttest_ind(ocd_values, hc_values, equal_var=False)
         
-        if hc_count < DEFAULT_CONFIG['min_subjects_per_group'] or ocd_count < DEFAULT_CONFIG['min_subjects_per_group']:
-            logger.warning(
-                "Skipping feature %s (%s_%s) due to insufficient group data (HC n=%d, OCD n=%d)",
-                feature, net1, net2, hc_count, ocd_count
-            )
-            dropped_features.append((feature, f"HC n={hc_count}, OCD n={ocd_count}"))
-            continue
-        
-        try:
-            # Perform ANCOVA with condition as confounder
-            # Create formula for ANCOVA
-            formula = f"{feature} ~ group + condition"
-            
-            # Fit the model
-            model = ols(formula, data=feature_data).fit()
-            
-            # Get group effect (HC vs OCD)
-            group_effect = model.params.get('group[T.OCD]', 0)
-            group_pval = model.pvalues.get('group[T.OCD]', 1.0)
-            
-            # Get condition effect
-            condition_effects = {}
-            condition_pvals = {}
-            for cond in feature_data['condition'].unique():
-                if cond != feature_data['condition'].iloc[0]:  # Reference condition
-                    cond_param = f"condition[T.{cond}]"
-                    condition_effects[cond] = model.params.get(cond_param, 0)
-                    condition_pvals[cond] = model.pvalues.get(cond_param, 1.0)
-            
-            # Calculate means
-            hc_mean = feature_data[feature_data['group'] == 'HC'][feature].mean()
-            ocd_mean = feature_data[feature_data['group'] == 'OCD'][feature].mean()
-            
-            results.append({
-                'ROI': feature,
-                'network1': net1,
-                'network2': net2,
-                'group_effect': group_effect,  # OCD vs HC (positive = OCD > HC)
-                'group_p_value': group_pval,
-                'OCD_mean': ocd_mean,
-                'HC_mean': hc_mean,
-                'OCD_n': ocd_count,
-                'HC_n': hc_count,
-                'condition_effects': condition_effects,
-                'condition_p_values': condition_pvals,
-                'model_r_squared': model.rsquared,
-                'model_adj_r_squared': model.rsquared_adj
-            })
-            
-        except Exception as e:
-            logger.warning(
-                "Failed to run ANCOVA for feature %s (%s_%s): %s",
-                feature, net1, net2, e
-            )
-            dropped_features.append((feature, f"ANCOVA failed: {e}"))
-            continue
+        results.append({
+            'ROI': feature,
+            'network1': net1,
+            'network2': net2,
+            't_statistic': t_stat,
+            'p_value': p_val,
+            'OCD_mean': np.mean(ocd_values),
+            'HC_mean': np.mean(hc_values),
+            'OCD_n': len(ocd_values),
+            'HC_n': len(ocd_values)
+        })
     
     if dropped_features:
         logger.info(
