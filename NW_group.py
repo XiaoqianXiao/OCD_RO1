@@ -642,28 +642,16 @@ def load_and_validate_metadata(
 
     # Load condition information from shared_demographics.csv
     try:
-        # Look for shared_demographics.csv in the same directory as subjects_csv
-        subjects_dir = os.path.dirname(subjects_csv)
-        shared_demo_path = os.path.join(subjects_dir, 'shared_demographics.csv')
-        
-        if os.path.exists(shared_demo_path):
-            df_shared = pd.read_csv(shared_demo_path)
-            df_shared['subject_id'] = df_shared['sub'].astype(str)
+        # The subjects_csv IS the shared_demographics.csv file, so condition info is already there
+        if 'condition' in df.columns:
+            # Fill missing conditions with 'unknown' for HC subjects, keep actual values for OCD subjects
+            df.loc[df['group'] == 'HC', 'condition'] = 'unknown'
+            df.loc[df['group'] == 'OCD', 'condition'] = df.loc[df['group'] == 'OCD', 'condition'].fillna('unknown')
             
-            # Merge condition information with main metadata
-            df = df.merge(
-                df_shared[['subject_id', 'condition']], 
-                on='subject_id', 
-                how='left'
-            )
-            
-            # Fill missing conditions with 'unknown'
-            df['condition'] = df['condition'].fillna('unknown')
-            
-            logger.info("Loaded condition information from %s", shared_demo_path)
+            logger.info("Loaded condition information from subjects CSV")
             logger.info("Condition distribution: %s", df['condition'].value_counts().to_dict())
         else:
-            logger.warning("shared_demographics.csv not found at %s. Adding default condition column.", shared_demo_path)
+            logger.warning("No 'condition' column found in subjects CSV. Adding default condition column.")
             df['condition'] = 'unknown'
             
     except Exception as e:
