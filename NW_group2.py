@@ -860,7 +860,7 @@ def perform_longitudinal_analysis(
             ocd_df.set_index('subject_id')['delta_ybocs'],
             feature_columns,
             "baseline FC vs delta YBOCS",
-            df,
+            metadata_df,
             logger
         )
         
@@ -941,7 +941,7 @@ def perform_longitudinal_analysis(
             ocd_df.set_index('subject_id')['delta_ybocs'],
             feature_columns,
             "delta FC vs delta YBOCS",
-            df,
+            metadata_df,
             logger
         )
         
@@ -1225,10 +1225,10 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
         
         # Load metadata
-        df, df_clinical = load_and_validate_metadata(args.subjects_csv, args.clinical_csv, logger)
+        metadata_df, df_clinical = load_and_validate_metadata(args.subjects_csv, args.clinical_csv, logger)
 
         # Normalize subject IDs
-        df['subject_id'] = df['subject_id'].str.replace('sub-', '')
+        metadata_df['subject_id'] = metadata_df['subject_id'].str.replace('sub-', '')
         df_clinical['subject_id'] = df_clinical['subject_id'].str.replace('sub-', '')
         logger.debug("Normalized subject IDs in metadata")
 
@@ -1251,7 +1251,7 @@ def main():
         
         # Validate subjects
         valid_group, valid_longitudinal, subject_sessions = validate_subjects(
-            args.input_dir, df, atlas_name, logger
+            args.input_dir, metadata_df, atlas_name, logger
         )
         
         if not valid_group and not valid_longitudinal:
@@ -1269,19 +1269,19 @@ def main():
 
         # 1. Group difference at baseline
         if valid_group:
-            perform_group_analysis(baseline_fc_data, df, feature_columns, args.output_dir, atlas_name, logger)
+            perform_group_analysis(baseline_fc_data, metadata_df, feature_columns, args.output_dir, atlas_name, logger)
 
         # 2. Longitudinal analyses
         if valid_longitudinal:
             perform_longitudinal_analysis(
-                baseline_fc_data, df, df_clinical, valid_longitudinal, 
+                baseline_fc_data, metadata_df, df_clinical, valid_longitudinal, 
                 feature_columns, args.input_dir, args.output_dir, atlas_name, logger
             )
 
         # 3. Condition-based analysis (Test 4)
         if valid_group:
             perform_condition_analysis(
-                baseline_fc_data, df, valid_longitudinal, 
+                baseline_fc_data, metadata_df, valid_longitudinal, 
                 args.input_dir, args.output_dir, atlas_name, logger
             )
 
