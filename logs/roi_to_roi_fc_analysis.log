@@ -177,3 +177,88 @@
 2025-08-22 13:54:41 - FC_Analysis - INFO - ================================================================================
 2025-08-22 13:54:41 - FC_Analysis - INFO - Functional Connectivity Analysis Completed
 2025-08-22 13:54:41 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:13 - FC_Analysis - INFO - Checking available atlases...
+2025-08-22 14:21:13 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:13 - FC_Analysis - INFO - Starting Functional Connectivity Analysis
+2025-08-22 14:21:13 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:13 - FC_Analysis - INFO - Subject: dummy
+2025-08-22 14:21:13 - FC_Analysis - INFO - Atlas: power_2011
+2025-08-22 14:21:13 - FC_Analysis - INFO - Label pattern: power
+2025-08-22 14:21:13 - FC_Analysis - INFO - Output directory: ./results/NW_1st
+2025-08-22 14:21:13 - FC_Analysis - INFO - Setting up atlas and network labels...
+2025-08-22 14:21:13 - FC_Analysis - INFO - Loading atlas: power_2011
+2025-08-22 14:21:13 - FC_Analysis - INFO - Loading Power 2011 atlas
+2025-08-22 14:21:13 - FC_Analysis - INFO - Loaded Power 2011 atlas: ./roi/power_2011_atlas.nii.gz, shape: (99, 117, 95)
+2025-08-22 14:21:13 - FC_Analysis - INFO - Using ROI directory Power 2011 network labels: ./roi/power264/power264NodeNames.txt
+2025-08-22 14:21:13 - FC_Analysis - INFO - Loaded 264 network labels from ./roi/power264/power264NodeNames.txt
+2025-08-22 14:21:13 - FC_Analysis - INFO - Loaded Power 2011 atlas: 264 ROIs, 13 networks
+2025-08-22 14:21:13 - FC_Analysis - INFO - Atlas loaded: shape=(99, 117, 95), ROIs=264
+2025-08-22 14:21:13 - FC_Analysis - INFO - Network labels: 13 unique networks
+2025-08-22 14:21:13 - FC_Analysis - INFO - Processing subject: dummy
+2025-08-22 14:21:13 - FC_Analysis - INFO - Processing session: ses-baseline
+2025-08-22 14:21:13 - FC_Analysis - WARNING - No mask file found for dummy ses-baseline
+2025-08-22 14:21:13 - FC_Analysis - WARNING - Skipping session ses-baseline for dummy
+2025-08-22 14:21:13 - FC_Analysis - INFO - Processing session: ses-followup
+2025-08-22 14:21:13 - FC_Analysis - WARNING - No mask file found for dummy ses-followup
+2025-08-22 14:21:13 - FC_Analysis - WARNING - Skipping session ses-followup for dummy
+2025-08-22 14:21:13 - FC_Analysis - ERROR - No functional connectivity matrices generated for dummy
+2025-08-22 14:21:13 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:13 - FC_Analysis - INFO - Functional Connectivity Analysis Completed
+2025-08-22 14:21:13 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:18 - FC_Analysis - INFO - Checking available atlases...
+2025-08-22 14:21:18 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:18 - FC_Analysis - INFO - Starting Functional Connectivity Analysis
+2025-08-22 14:21:18 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:18 - FC_Analysis - INFO - Subject: dummy
+2025-08-22 14:21:18 - FC_Analysis - INFO - Atlas: power_2011
+2025-08-22 14:21:18 - FC_Analysis - INFO - Label pattern: power
+2025-08-22 14:21:18 - FC_Analysis - INFO - Output directory: ./results/NW_1st
+2025-08-22 14:21:18 - FC_Analysis - INFO - Setting up atlas and network labels...
+2025-08-22 14:21:18 - FC_Analysis - INFO - Loading atlas: power_2011
+2025-08-22 14:21:18 - FC_Analysis - INFO - Loading Power 2011 atlas
+2025-08-22 14:21:18 - FC_Analysis - INFO - Loaded Power 2011 atlas: ./roi/power_2011_atlas.nii.gz, shape: (99, 117, 95)
+2025-08-22 14:21:18 - FC_Analysis - INFO - Using ROI directory Power 2011 network labels: ./roi/power264/power264NodeNames.txt
+2025-08-22 14:21:18 - FC_Analysis - INFO - Loaded 264 network labels from ./roi/power264/power264NodeNames.txt
+2025-08-22 14:21:18 - FC_Analysis - INFO - Loaded Power 2011 atlas: 264 ROIs, 13 networks
+2025-08-22 14:21:18 - FC_Analysis - INFO - Atlas loaded: shape=(99, 117, 95), ROIs=264
+2025-08-22 14:21:18 - FC_Analysis - INFO - Network labels: 13 unique networks
+2025-08-22 14:21:18 - FC_Analysis - INFO - Processing subject: dummy
+2025-08-22 14:21:18 - FC_Analysis - INFO - Processing session: ses-baseline
+2025-08-22 14:21:18 - FC_Analysis - WARNING - No mask file found for dummy ses-baseline
+2025-08-22 14:21:18 - FC_Analysis - WARNING - Skipping session ses-baseline for dummy
+2025-08-22 14:21:18 - FC_Analysis - INFO - Processing session: ses-followup
+2025-08-22 14:21:18 - FC_Analysis - WARNING - No mask file found for dummy ses-followup
+2025-08-22 14:21:18 - FC_Analysis - WARNING - Skipping session ses-followup for dummy
+2025-08-22 14:21:18 - FC_Analysis - ERROR - No functional connectivity matrices generated for dummy
+2025-08-22 14:21:18 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:18 - FC_Analysis - INFO - Functional Connectivity Analysis Completed
+2025-08-22 14:21:18 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:33 - FC_Analysis - INFO - Checking available atlases...
+2025-08-22 14:21:33 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:33 - FC_Analysis - INFO - Starting Functional Connectivity Analysis
+2025-08-22 14:21:33 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:33 - FC_Analysis - INFO - Subject: dummy
+2025-08-22 14:21:33 - FC_Analysis - INFO - Atlas: schaefer_2018
+2025-08-22 14:21:33 - FC_Analysis - INFO - Atlas parameters: {"n_rois": 100, "yeo_networks": 7}
+2025-08-22 14:21:33 - FC_Analysis - INFO - Label pattern: power
+2025-08-22 14:21:33 - FC_Analysis - INFO - Output directory: ./results/NW_1st
+2025-08-22 14:21:33 - FC_Analysis - INFO - Setting up atlas and network labels...
+2025-08-22 14:21:33 - FC_Analysis - INFO - Loading atlas: schaefer_2018
+2025-08-22 14:21:33 - FC_Analysis - INFO - Fetching Nilearn atlas: schaefer_2018
+2025-08-22 14:21:33 - FC_Analysis - INFO - Fetching schaefer_2018 atlas with parameters: {'n_rois': 100, 'yeo_networks': 7, 'resolution_mm': 2}
+2025-08-22 14:21:33 - FC_Analysis - INFO - Generated Schaefer 2018 network labels: 7 networks, 100 ROIs
+2025-08-22 14:21:33 - FC_Analysis - INFO - Successfully fetched schaefer_2018 atlas: 100 ROIs, shape=(91, 109, 91)
+2025-08-22 14:21:33 - FC_Analysis - INFO - Generated 7 unique network labels
+2025-08-22 14:21:33 - FC_Analysis - INFO - Atlas loaded: shape=(91, 109, 91), ROIs=100
+2025-08-22 14:21:33 - FC_Analysis - INFO - Network labels: 7 unique networks
+2025-08-22 14:21:33 - FC_Analysis - INFO - Processing subject: dummy
+2025-08-22 14:21:33 - FC_Analysis - INFO - Processing session: ses-baseline
+2025-08-22 14:21:33 - FC_Analysis - WARNING - No mask file found for dummy ses-baseline
+2025-08-22 14:21:33 - FC_Analysis - WARNING - Skipping session ses-baseline for dummy
+2025-08-22 14:21:33 - FC_Analysis - INFO - Processing session: ses-followup
+2025-08-22 14:21:33 - FC_Analysis - WARNING - No mask file found for dummy ses-followup
+2025-08-22 14:21:33 - FC_Analysis - WARNING - Skipping session ses-followup for dummy
+2025-08-22 14:21:33 - FC_Analysis - ERROR - No functional connectivity matrices generated for dummy
+2025-08-22 14:21:33 - FC_Analysis - INFO - ================================================================================
+2025-08-22 14:21:33 - FC_Analysis - INFO - Functional Connectivity Analysis Completed
+2025-08-22 14:21:33 - FC_Analysis - INFO - ================================================================================

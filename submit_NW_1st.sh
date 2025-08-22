@@ -26,31 +26,32 @@
 #   3. Submit with Schaefer 2018 atlas (400 ROIs, 7 networks) - high resolution:
 #      bash submit_NW_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 400, "yeo_networks": 7}'
 #
-#   4. Submit with Schaefer 2018 atlas (1000 ROIs, 17 networks) - maximum resolution:
+#   3. Submit with Schaefer 2018 atlas (1000 ROIs, 17 networks) - maximum resolution:
 #      bash submit_NW_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 1000, "yeo_networks": 17}'
 #
-#   5. Submit with Harvard-Oxford atlas (anatomical):
+#   4. Submit with Harvard-Oxford atlas (anatomical):
 #      bash submit_NW_1st.sh --atlas harvard_oxford --atlas-params '{"atlas_name": "cort-maxprob-thr25-2mm"}'
 #
-#   6. Submit with AAL atlas (standard anatomical):
+#   5. Submit with AAL atlas (standard anatomical):
 #      bash submit_NW_1st.sh --atlas aal
 #
-#   7. Submit with custom label pattern for Power 2011:
+#   6. Submit with custom label pattern for Power 2011:
 #      bash submit_NW_1st.sh --atlas power_2011 --label-pattern custom --custom-regex "network_(\\d+)_(.+)"
 #
-#   8. Submit with Yeo 2011 atlas (7 networks):
+#   7. Submit with Yeo 2011 atlas (7 networks):
 #      bash submit_NW_1st.sh --atlas yeo_2011 --atlas-params '{"n_rois": 7}'
 #
 # OPTIONS:
 #   --atlas ATLAS            Atlas name (default: power_2011)
 #   --atlas-params PARAMS   JSON string of atlas parameters
 #   --label-pattern PATTERN Label pattern (default: power)
+#   --custom-regex REGEX    Custom regex pattern for label parsing (use with --label-pattern custom)
 #   --help                   Show this usage information
 #
 # ATLAS TYPES:
 #   - power_2011: Power 2011 atlas (264 ROIs, 14 networks) - DEFAULT
 #     * Automatically generates atlas from coordinates if file doesn't exist
-#     * Uses network labels from /Users/xiaoqianxiao/tool/parcellation/power264/
+#     * Uses network labels from /scratch/xxqian/roi/power264/
 #     * Best for: Standard functional connectivity analysis with established networks
 #   - schaefer_2018: Schaefer 2018 parcellation (100-1000 ROIs, 7/17 networks)
 #     * Highly customizable: choose ROI count and network count
@@ -111,11 +112,16 @@ while [[ $# -gt 0 ]]; do
             LABEL_PATTERN="$2"
             shift 2
             ;;
+        --custom-regex)
+            CUSTOM_REGEX="$2"
+            shift 2
+            ;;
         --help)
-            echo "Usage: $0 [--atlas ATLAS] [--atlas-params PARAMS] [--label-pattern PATTERN]"
+            echo "Usage: $0 [--atlas ATLAS] [--atlas-params PARAMS] [--label-pattern PATTERN] [--custom-regex REGEX]"
             echo "  --atlas ATLAS            Atlas name (default: power_2011)"
             echo "  --atlas-params PARAMS   JSON string of atlas parameters"
             echo "  --label-pattern PATTERN Label pattern (default: power)"
+            echo "  --custom-regex REGEX    Custom regex pattern for label parsing (use with --label-pattern custom)"
             exit 0
             ;;
         *)
