@@ -1,28 +1,45 @@
 #!/bin/bash
 
-# SLURM job submission script for running roi-to-roi for each subject
+# SLURM job submission script for running NW_1st.py functional connectivity analysis
+# 
+# This script submits individual SLURM jobs for each subject to compute:
+# - ROI-to-ROI functional connectivity matrices
+# - ROI-to-Network functional connectivity
+# - Network-to-Network functional connectivity
+# 
+# DEFAULT ATLAS: Power 2011 (264 ROIs, 14 networks) - automatically generated from coordinates
 # 
 # USAGE:
 #   bash submit_NW_1st.sh [OPTIONS]
+#
+# NOTE: The Power 2011 atlas (default) will automatically generate the atlas file
+# from coordinates if it doesn't exist, and will use network labels from your local
+# tool directory. No manual atlas setup required!
 #
 # EXAMPLES:
 #   1. Submit all subjects with default Power 2011 atlas:
 #      bash submit_NW_1st.sh
 #
-#   2. Submit with Schaefer 2018 atlas (200 ROIs, 7 networks):
-#      bash submit_NW_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 200, "yeo_networks": 7}'
+#   2. Submit with Schaefer 2018 atlas (100 ROIs, 7 networks) - good balance:
+#      bash submit_NW_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 100, "yeo_networks": 7}'
 #
-#   3. Submit with Schaefer 2018 atlas (400 ROIs, 7 networks):
+#   3. Submit with Schaefer 2018 atlas (400 ROIs, 7 networks) - high resolution:
 #      bash submit_NW_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 400, "yeo_networks": 7}'
 #
-#   4. Submit with Harvard-Oxford atlas:
+#   4. Submit with Schaefer 2018 atlas (1000 ROIs, 17 networks) - maximum resolution:
+#      bash submit_NW_1st.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 1000, "yeo_networks": 17}'
+#
+#   5. Submit with Harvard-Oxford atlas (anatomical):
 #      bash submit_NW_1st.sh --atlas harvard_oxford --atlas-params '{"atlas_name": "cort-maxprob-thr25-2mm"}'
 #
-#   5. Submit with AAL atlas:
+#   6. Submit with AAL atlas (standard anatomical):
 #      bash submit_NW_1st.sh --atlas aal
 #
-#   6. Submit with custom label pattern:
-#      bash submit_NW_1st.sh --atlas power_2011 --label-pattern simple
+#   7. Submit with custom label pattern for Power 2011:
+#      bash submit_NW_1st.sh --atlas power_2011 --label-pattern custom --custom-regex "network_(\\d+)_(.+)"
+#
+#   8. Submit with Yeo 2011 atlas (7 networks):
+#      bash submit_NW_1st.sh --atlas yeo_2011 --atlas-params '{"n_rois": 7}'
 #
 # OPTIONS:
 #   --atlas ATLAS            Atlas name (default: power_2011)
@@ -31,18 +48,38 @@
 #   --help                   Show this usage information
 #
 # ATLAS TYPES:
-#   - power_2011: Power 2011 atlas (264 ROIs, 13 networks)
+#   - power_2011: Power 2011 atlas (264 ROIs, 14 networks) - DEFAULT
+#     * Automatically generates atlas from coordinates if file doesn't exist
+#     * Uses network labels from /Users/xiaoqianxiao/tool/parcellation/power264/
+#     * Best for: Standard functional connectivity analysis with established networks
 #   - schaefer_2018: Schaefer 2018 parcellation (100-1000 ROIs, 7/17 networks)
+#     * Highly customizable: choose ROI count and network count
+#     * Best for: High-resolution parcellation with Yeo network assignments
 #   - harvard_oxford: Harvard-Oxford cortical/subcortical atlases
+#     * Anatomically defined regions
+#     * Best for: Anatomical ROI analysis
 #   - aal: Automated Anatomical Labeling atlas (116 ROIs)
+#     * Standard anatomical parcellation
+#     * Best for: Traditional anatomical ROI analysis
 #   - talairach: Talairach atlas (1107 ROIs)
+#     * High-resolution anatomical parcellation
+#     * Best for: Detailed anatomical analysis
 #   - yeo_2011: Yeo 2011 network parcellation (7/17 networks)
+#     * Pure network-based parcellation
+#     * Best for: Network-focused analysis
 #
 # LABEL PATTERNS:
-#   - power: Power 2011 label format (default)
-#   - simple: Simple numeric labels
-#   - harvard_oxford: Harvard-Oxford label format
-#   - custom: Custom regex pattern
+#   - power: Power 2011 label format (default) - automatically loads from /scratch/xxqian/roi/power264/
+#   - nilearn: Built-in atlas label format (for Schaefer, Harvard-Oxford, AAL, etc.)
+#   - custom: Custom regex pattern (use with --custom-regex)
+#
+# POWER 2011 ATLAS FEATURES:
+#   - Automatic atlas generation from coordinates if file doesn't exist
+#   - Uses real network labels from cluster directory: /scratch/xxqian/roi/power264/
+#   - 264 ROIs organized into 14 functional networks
+#   - 3mm spherical ROIs around Power 2011 coordinates
+#   - No need to pre-download or install atlas files
+#   - Container automatically mounts /scratch/xxqian for access to labels
 #
 # SLURM CONFIGURATION:
 #   - Memory: 8G per job
@@ -171,3 +208,25 @@ EOF
 done
 
 echo "All jobs submitted. Check status with 'squeue -u $USER'"
+
+echo ""
+echo "TROUBLESHOOTING:"
+echo "================"
+echo "1. If Power 2011 atlas fails:"
+echo "   - Check that /scratch/xxqian/roi/power264/power264NodeNames.txt exists"
+echo "   - Verify the file has exactly 264 lines"
+echo "   - Ensure the file is readable by the container"
+echo ""
+echo "2. If other atlases fail:"
+echo "   - Check network connectivity for Nilearn downloads"
+echo "   - Verify container has sufficient disk space"
+echo "   - Check SLURM logs for specific error messages"
+echo ""
+echo "3. For custom atlases:"
+echo "   - Ensure --labels file exists and is accessible"
+echo "   - Verify --custom-regex pattern matches your label format"
+echo ""
+echo "4. Check job status:"
+echo "   - squeue -u $USER          # View running jobs"
+echo "   - scancel <job_id>         # Cancel specific job"
+echo "   - tail -f <log_file>       # Monitor job progress"

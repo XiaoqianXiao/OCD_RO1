@@ -209,6 +209,7 @@ else:  # Local machine
         'log_file': './logs/roi_to_roi_fc_analysis.log'
     })
 
+
 # Analysis parameters
 ANALYSIS_PARAMS = {
     'sessions': ['ses-baseline', 'ses-followup'],
@@ -1770,11 +1771,11 @@ def load_atlas_and_labels(
                     logger.error("Power.rois['roi'] does not contain 1–264 in order")
                     raise ValueError("Invalid ROI numbers in power.rois")
                 
-                # Use local Power 2011 network labels if available
-                local_power_labels = '/Users/xiaoqianxiao/tool/parcellation/power264/power264NodeNames.txt'
-                if os.path.exists(local_power_labels):
-                    network_labels_path = local_power_labels
-                    logger.info(f"Using local Power 2011 network labels: {network_labels_path}")
+                # Use cluster Power 2011 network labels if available
+                cluster_power_labels = '/scratch/xxqian/roi/power264/power264NodeNames.txt'
+                if os.path.exists(cluster_power_labels):
+                    network_labels_path = cluster_power_labels
+                    logger.info(f"Using cluster Power 2011 network labels: {network_labels_path}")
                 else:
                     network_labels_path = os.path.join(CONFIG['roi_dir'], 'power264', 'power264NodeNames.txt')
                     logger.info(f"Using ROI directory Power 2011 network labels: {network_labels_path}")
