@@ -301,10 +301,11 @@ if 'fetch_atlas_pauli_2017' in globals() and fetch_atlas_pauli_2017 is not None:
 if 'fetch_atlas_yeo_2011' in globals():
     NILEARN_ATLASES['yeo_2011'] = {
         'function': fetch_atlas_yeo_2011,
-        'default_params': {'n_rois': 7},
+        'default_params': {'n_networks': 7, 'thickness': 'thick'},
         'description': 'Yeo 2011 network parcellation (7 or 17 networks)',
         'param_options': {
-            'n_rois': [7, 17]
+            'n_networks': [7, 17],
+            'thickness': ['thick', 'thin']
         },
         'network_based': True
     }
@@ -488,11 +489,12 @@ DETAILED USAGE EXAMPLES
    python NW_1st.py \\
      --subject sub-AOCD001 \\
      --atlas yeo_2011 \\
-     --atlas-params '{"n_rois": 17}' \\
+     --atlas-params '{"n_networks": 17}' \\
      --label-pattern nilearn
    
    Available parameters:
-   - n_rois: 7 or 17
+   - n_networks: 7 or 17
+   - thickness: 'thick' or 'thin'
 
 5. CUSTOM ATLAS WITH NETWORK LABELS
    --------------------------------
@@ -588,7 +590,8 @@ Harvard-Oxford:
   - atlas_name: Atlas variant name
 
 Yeo 2011:
-  - n_rois: Number of networks (7 or 17)
+  - n_networks: Number of networks (7 or 17)
+  - thickness: 'thick' or 'thin'
 
 Power 2011, AAL, Talairach, Pauli 2017:
   - No additional parameters needed
@@ -915,13 +918,18 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
                         n_rois = len(np.unique(atlas_img.get_fdata())) - 1  # Exclude background (0)
                         for i in range(n_rois):
                             network_labels[i + 1] = f"Network_{i+1}"
+
             elif 'labels' in atlas_data:
                 labels = atlas_data['labels']
                 for i, label in enumerate(labels):
                     if isinstance(label, str):
                         # Extract network name from label
                         if '_' in label:
-                            network_name = label.rsplit('_', 1)[0]
+                            # For YEO 2011: "7Networks_1" -> "Network_1", "17Networks_1" -> "Network_1"
+                            if label.startswith(('7Networks_', '17Networks_')):
+                                network_name = f"Network_{label.split('_')[1]}"
+                            else:
+                                network_name = label.rsplit('_', 1)[0]
                         else:
                             network_name = label
                         network_labels[i + 1] = network_name
@@ -933,10 +941,31 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
                 for i in range(n_rois):
                     network_labels[i + 1] = f"Network_{i+1}"
         else:
-            # For non-network atlases, generate anatomical labels
+            # For non-network atlases, use actual anatomical labels if available
             n_rois = len(np.unique(atlas_img.get_fdata())) - 1  # Exclude background (0)
-            for i in range(n_rois):
-                network_labels[i + 1] = f"Region_{i+1}"
+            
+            # Check if atlas_data has labels (e.g., Harvard-Oxford)
+            if 'labels' in atlas_data and atlas_data['labels']:
+                # Use actual anatomical labels
+                actual_labels = atlas_data['labels']
+                logger.info(f"Using actual anatomical labels from atlas_data: {len(actual_labels)} labels")
+                
+                # Skip background label (index 0) and map ROI numbers to actual labels
+                # Harvard-Oxford labels include "Background" at index 0, so we start from index 1
+                for i in range(min(n_rois, len(actual_labels) - 1)):
+                    network_labels[i + 1] = actual_labels[i + 1]  # Skip background (index 0)
+                
+                # If there are more ROIs than labels (excluding background), generate generic names for the extra ones
+                available_labels = len(actual_labels) - 1  # Exclude background label
+                if n_rois > available_labels:
+                    logger.warning(f"More ROIs ({n_rois}) than available labels ({available_labels}). Generating generic names for extra ROIs.")
+                    for i in range(available_labels, n_rois):
+                        network_labels[i + 1] = f"Region_{i+1}"
+            else:
+                # Fallback: generate generic anatomical labels
+                logger.info(f"No labels available in atlas_data, generating generic labels for {n_rois} ROIs")
+                for i in range(n_rois):
+                    network_labels[i + 1] = f"Region_{i+1}"
         
         logger.info(f"Successfully fetched {atlas_name} atlas: {len(network_labels)} ROIs, shape={atlas_img.shape}")
         logger.info(f"Generated {len(set(network_labels.values()))} unique network labels")
