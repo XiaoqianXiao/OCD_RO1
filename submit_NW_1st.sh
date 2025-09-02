@@ -7,14 +7,14 @@
 # - ROI-to-Network functional connectivity
 # - Network-to-Network functional connectivity
 # 
-# DEFAULT ATLAS: Power 2011 (264 ROIs, 14 networks) - automatically generated from coordinates
+# DEFAULT ATLAS: Power 2011 (264 ROIs, 13 networks) - local file-based
 # 
 # USAGE:
 #   bash submit_NW_1st.sh [OPTIONS]
 #
-# NOTE: The Power 2011 atlas (default) will automatically generate the atlas file
-# from coordinates if it doesn't exist, and will use network labels from your local
-# tool directory. No manual atlas setup required!
+# NOTE: The Power 2011 atlas (default) requires the atlas file to exist at
+# /scratch/xxqian/roi/power_2011_atlas.nii.gz and network labels from
+# /scratch/xxqian/roi/power264/power264NodeNames.txt
 #
 # EXAMPLES:
 #   1. Submit all subjects with default Power 2011 atlas:
@@ -39,7 +39,10 @@
 #      bash submit_NW_1st.sh --atlas power_2011 --label-pattern custom --custom-regex "network_(\\d+)_(.+)"
 #
 #   7. Submit with Yeo 2011 atlas (7 networks):
-#      bash submit_NW_1st.sh --atlas yeo_2011 --atlas-params '{"n_rois": 7}'
+#      bash submit_NW_1st.sh --atlas yeo_2011 --atlas-params '{"n_networks": 7, "thickness": "thick"}'
+#
+#   8. Submit with Yeo 2011 atlas (17 networks):
+#      bash submit_NW_1st.sh --atlas yeo_2011 --atlas-params '{"n_networks": 17, "thickness": "thick"}'
 #
 # OPTIONS:
 #   --atlas ATLAS            Atlas name (default: power_2011)
@@ -49,8 +52,8 @@
 #   --help                   Show this usage information
 #
 # ATLAS TYPES:
-#   - power_2011: Power 2011 atlas (264 ROIs, 14 networks) - DEFAULT
-#     * Automatically generates atlas from coordinates if file doesn't exist
+#   - power_2011: Power 2011 atlas (264 ROIs, 13 networks) - DEFAULT
+#     * Requires atlas file at /scratch/xxqian/roi/power_2011_atlas.nii.gz
 #     * Uses network labels from /scratch/xxqian/roi/power264/
 #     * Best for: Standard functional connectivity analysis with established networks
 #   - schaefer_2018: Schaefer 2018 parcellation (100-1000 ROIs, 7/17 networks)
@@ -66,7 +69,7 @@
 #     * High-resolution anatomical parcellation
 #     * Best for: Detailed anatomical analysis
 #   - yeo_2011: Yeo 2011 network parcellation (7/17 networks)
-#     * Pure network-based parcellation
+#     * Pure network-based parcellation with n_networks and thickness parameters
 #     * Best for: Network-focused analysis
 #
 # LABEL PATTERNS:
@@ -75,12 +78,11 @@
 #   - custom: Custom regex pattern (use with --custom-regex)
 #
 # POWER 2011 ATLAS FEATURES:
-#   - Automatic atlas generation from coordinates if file doesn't exist
+#   - Requires pre-existing atlas file: /scratch/xxqian/roi/power_2011_atlas.nii.gz
 #   - Uses real network labels from cluster directory: /scratch/xxqian/roi/power264/
-#   - 264 ROIs organized into 14 functional networks
-#   - 3mm spherical ROIs around Power 2011 coordinates
-#   - No need to pre-download or install atlas files
-#   - Container automatically mounts /scratch/xxqian for access to labels
+#   - 264 ROIs organized into 13 functional networks
+#   - Local file-based loading (no coordinate generation)
+#   - Container automatically mounts /scratch/xxqian for access to files
 #
 # SLURM CONFIGURATION:
 #   - Memory: 8G per job
@@ -219,9 +221,10 @@ echo ""
 echo "TROUBLESHOOTING:"
 echo "================"
 echo "1. If Power 2011 atlas fails:"
+echo "   - Check that /scratch/xxqian/roi/power_2011_atlas.nii.gz exists"
 echo "   - Check that /scratch/xxqian/roi/power264/power264NodeNames.txt exists"
-echo "   - Verify the file has exactly 264 lines"
-echo "   - Ensure the file is readable by the container"
+echo "   - Verify the label file has exactly 264 lines"
+echo "   - Ensure both files are readable by the container"
 echo ""
 echo "2. If other atlases fail:"
 echo "   - Check network connectivity for Nilearn downloads"
