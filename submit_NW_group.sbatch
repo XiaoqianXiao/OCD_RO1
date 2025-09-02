@@ -9,23 +9,36 @@
 # FC data, comparing healthy controls vs. OCD patients and performing
 # longitudinal analyses.
 #
+# NOTE: By default, this script uses --auto-detect-atlas to automatically
+# detect the atlas name from input FC files. For Power 2011 atlas, this will
+# detect "power_2011" from files named power_2011_network_fc_avg.csv.
+#
 # USAGE:
 #   sbatch submit_NW_group.sbatch
 #
 # EXAMPLES:
-#   1. Run with default settings:
+#   1. Run with default Power 2011 atlas (auto-detected):
 #      sbatch submit_NW_group.sbatch
 #
-#   2. Check job status:
+#   2. Run with specific Power 2011 atlas:
+#      sbatch submit_NW_group.sbatch --atlas power_2011
+#
+#   3. Run with Schaefer 2018 atlas (400 ROIs, 7 networks):
+#      sbatch submit_NW_group.sbatch --atlas schaefer_2018_400_7_2
+#
+#   4. Run with Schaefer 2018 atlas (1000 ROIs, 17 networks):
+#      sbatch submit_NW_group.sbatch --atlas schaefer_2018_1000_17_1
+#
+#   5. Check job status:
 #      squeue -u xxqian
 #
-#   3. Check job logs:
+#   6. Check job logs:
 #      tail -f /scratch/xxqian/logs/NWGroup_<JOB_ID>.out
 #
-#   4. Monitor job progress:
+#   7. Monitor job progress:
 #      watch -n 10 'squeue -u xxqian'
 #
-#   5. Check specific job details:
+#   8. Check specific job details:
 #      scontrol show job <JOB_ID>
 #
 # REQUIRED FILES:
@@ -53,12 +66,49 @@
 #
 # TROUBLESHOOTING:
 # ----------------
-# 1. Check that all required directories exist
-# 2. Verify CSV file formats and column names
-# 3. Ensure container image is accessible
-# 4. Check SLURM job status and logs
-# 5. Verify FC data files exist in input directory
-# 6. Check atlas naming consistency with NW_1st.py output
+# 1. Power 2011 Atlas Issues:
+#    - Check that /scratch/xxqian/roi/power264/power264NodeNames.txt exists
+#    - Verify the file has exactly 264 lines
+#    - Ensure the file is readable by the container
+#    - Check that input FC files follow naming: power_2011_network_fc_avg.csv
+#
+# 2. General Issues:
+#    - Check that all required directories exist
+#    - Verify CSV file formats and column names
+#    - Ensure container image is accessible
+#    - Check SLURM job status and logs
+#    - Verify FC data files exist in input directory
+#    - Check atlas naming consistency with NW_1st.py output
+#
+# ATLAS TYPES:
+# ------------
+# - power_2011: Power 2011 atlas (264 ROIs, 14 networks) - DEFAULT
+#     * Automatically detected from input FC files
+#     * Uses network labels from /scratch/xxqian/roi/power264/
+#     * Best for: Standard functional connectivity analysis with established networks
+# - schaefer_2018: Schaefer 2018 parcellation (100-1000 ROIs, 7/17 networks)
+#     * Highly customizable: choose ROI count and network count
+#     * Naming: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}
+#     * Examples: schaefer_2018_400_7_2, schaefer_2018_1000_17_1
+# - harvard_oxford: Harvard-Oxford cortical/subcortical atlases
+#     * Anatomically defined regions
+#     * Best for: Anatomical ROI analysis
+# - aal: Automated Anatomical Labeling atlas (116 ROIs)
+#     * Standard anatomical parcellation
+#     * Best for: Traditional anatomical ROI analysis
+# - talairach: Talairach atlas (1107 ROIs)
+#     * High-resolution anatomical parcellation
+#     * Best for: Detailed anatomical analysis
+# - yeo_2011: Yeo 2011 network parcellation (7/17 networks)
+#     * Pure network-based parcellation
+#     * Best for: Network-focused analysis
+#
+# ATLAS DETECTION:
+# ----------------
+# The script automatically detects the atlas name from input FC files:
+# - Power 2011: power_2011_network_fc_avg.csv
+# - Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}_network_fc_avg.csv
+# - Custom: custom_atlas_network_fc_avg.csv
 #
 # For more information, see NW_group.py --help
 # =============================================================================

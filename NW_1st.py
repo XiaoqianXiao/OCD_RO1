@@ -61,7 +61,7 @@ Built-in Nilearn Atlases:
 - harvard_oxford: Harvard-Oxford cortical/subcortical atlases
 - aal: Automated Anatomical Labeling atlas (116 ROIs)
 - talairach: Talairach atlas (1107 ROIs)
-- coords_power_2012: Power 2012 coordinate-based atlas (264 ROIs)
+
 - pauli_2017: Pauli 2017 subcortical atlas (16 ROIs)
 - yeo_2011: Yeo 2011 7/17 network parcellation
 
@@ -108,7 +108,7 @@ try:
         load_mni152_template,
         fetch_atlas_schaefer_2018, fetch_atlas_harvard_oxford,
         fetch_atlas_aal, fetch_atlas_talairach,
-        fetch_atlas_coords_power_2012, fetch_atlas_pauli_2017,
+        fetch_atlas_pauli_2017,
         fetch_atlas_yeo_2011
     )
 except ImportError as e:
@@ -132,15 +132,7 @@ except ImportError as e:
                     print("Warning: Schaefer 2018 atlas not available in this Nilearn version")
                     fetch_atlas_schaefer_2018 = None
         
-        # Try alternative names for Power 2012 atlas
-        try:
-            from nilearn.datasets import fetch_atlas_coords_power_2012
-        except ImportError:
-            try:
-                from nilearn.datasets import fetch_coords_power_2012 as fetch_atlas_coords_power_2012
-            except ImportError:
-                print("Warning: Power 2012 atlas not available in this Nilearn version")
-                fetch_atlas_coords_power_2012 = None
+
         
         # Try alternative names for Pauli 2017 atlas
         try:
@@ -285,19 +277,15 @@ if 'fetch_atlas_talairach' in globals():
 
 # Add Power 2011 atlas (local file-based or generated from coordinates)
 power_atlas_path = os.path.join(CONFIG['roi_dir'], 'power_2011_atlas.nii.gz')
-try:
-    from nilearn.datasets import fetch_coords_power_2011
-    NILEARN_ATLASES['power_2011'] = {
-        'function': None,  # Not used for local file loading
-        'default_params': {},
-        'description': 'Power 2011 atlas (264 ROIs) - Local file or generated from coordinates',
-        'param_options': {},
-        'network_based': True,
-        'network_names': {}  # Network names loaded from external file
-    }
-except ImportError:
-    print("Warning: fetch_coords_power_2011 not available in this Nilearn version")
-    print("The power_2011 atlas will not be available")
+# Power 2011 atlas configuration (no coordinate fetching needed)
+NILEARN_ATLASES['power_2011'] = {
+    'function': None,  # Not used for local file loading
+    'default_params': {},
+    'description': 'Power 2011 atlas (264 ROIs) - Local file only',
+    'param_options': {},
+    'network_based': True,
+    'network_names': {}  # Network names loaded from external file
+}
 
 # Add Pauli 2017 atlas if available
 if 'fetch_atlas_pauli_2017' in globals() and fetch_atlas_pauli_2017 is not None:
@@ -366,7 +354,7 @@ Built-in Nilearn Atlases:
 - harvard_oxford: Harvard-Oxford cortical/subcortical atlases
 - aal: Automated Anatomical Labeling atlas (116 ROIs)
 - talairach: Talairach atlas (1107 ROIs)
-- coords_power_2012: Power 2012 coordinate-based atlas (264 ROIs)
+
 - pauli_2017: Pauli 2017 subcortical atlas (16 ROIs)
 - yeo_2011: Yeo 2011 network parcellation (7/17 networks)
 
@@ -1707,69 +1695,19 @@ def load_atlas_and_labels(
             power_atlas_path = os.path.join(CONFIG['roi_dir'], 'power_2011_atlas.nii.gz')
             
             if not os.path.exists(power_atlas_path):
-                logger.info("Generating Power 2011 atlas from coordinates")
-                try:
-                    from nilearn.datasets import fetch_coords_power_2011
-                    power = fetch_coords_power_2011()
-                    required_fields = ['roi', 'x', 'y', 'z']
-                    if not all(field in power.rois.columns for field in required_fields):
-                        logger.error(f"Power.rois missing required fields {required_fields}: {list(power.rois.columns)}")
-                        raise ValueError("Invalid Power 2011 atlas data structure")
-                    
-                    coords = np.vstack((power.rois['x'], power.rois['y'], power.rois['z'])).T
-                    logger.info(f"Power 2011 coordinates shape: {coords.shape} (expected: (264, 3))")
-                    
-                    template = load_mni152_template(resolution=2)
-                    atlas_data = np.zeros(template.shape, dtype=np.int32)
-                    
-                    for idx, coord in enumerate(coords):
-                        try:
-                            x, y, z = coord
-                            logger.debug(f"Processing ROI {idx + 1}: ({x}, {y}, {z})")
-                            voxel_coords = np.round(np.linalg.inv(template.affine).dot([x, y, z, 1])[:3]).astype(int)
-                            xx, yy, zz = np.ogrid[-3:4, -3:4, -3:4]
-                            sphere = (xx**2 + yy**2 + zz**2 <= 3**2).astype(int)
-                            atlas_data[
-                                voxel_coords[0]-3:voxel_coords[0]+4,
-                                voxel_coords[1]-3:voxel_coords[1]+4,
-                                voxel_coords[2]-3:voxel_coords[2]+4
-                            ] = np.maximum(atlas_data[
-                                voxel_coords[0]-3:voxel_coords[0]+4,
-                                voxel_coords[1]-3:voxel_coords[1]+4,
-                                voxel_coords[2]-3:voxel_coords[2]+4
-                            ], (idx + 1) * sphere)
-                        except (ValueError, IndexError) as e:
-                            logger.error(f"Skipping invalid coordinate at index {idx}: {coord}, error: {str(e)}")
-                            continue
-                    
-                    if np.all(atlas_data == 0):
-                        logger.error("Failed to generate atlas: all data is zero")
-                        raise ValueError("Atlas generation produced empty data")
-                    
-                    power_atlas = image.new_img_like(template, atlas_data)
-                    power_atlas.to_filename(power_atlas_path)
-                    logger.info(f"Generated Power 2011 atlas saved to {power_atlas_path}")
-                    
-                except Exception as e:
-                    logger.error(f"Failed to generate Power 2011 atlas: {str(e)}")
-                    raise
+                logger.error(f"Power 2011 atlas file not found: {power_atlas_path}")
+                logger.error("Please ensure the Power 2011 atlas file exists or generate it separately")
+                raise FileNotFoundError(f"Missing Power 2011 atlas file: {power_atlas_path}")
             
             # Load atlas and verify
             atlas_img = image.load_img(power_atlas_path)
             logger.info(f"Loaded Power 2011 atlas: {power_atlas_path}, shape: {atlas_img.shape}")
             
-            # Load network labels and coordinates
+            # Load network labels (simplified - no coordinate validation)
             try:
-                from nilearn.datasets import fetch_coords_power_2011
-                power = fetch_coords_power_2011()
-                n_rois = len(power.rois)  # 264 ROIs
-                required_fields = ['roi', 'x', 'y', 'z']
-                if not all(field in power.rois.columns for field in required_fields):
-                    logger.error(f"Power.rois missing required fields {required_fields}: {list(power.rois.columns)}")
-                    raise ValueError("Invalid Power 2011 atlas data structure")
-                if not np.array_equal(power.rois['roi'].values, np.arange(1, n_rois + 1)):
-                    logger.error("Power.rois['roi'] does not contain 1–264 in order")
-                    raise ValueError("Invalid ROI numbers in power.rois")
+                # Get number of ROIs from the atlas image
+                n_rois = len(np.unique(atlas_img.get_fdata())) - 1  # Exclude background (0)
+                logger.info(f"Power 2011 atlas has {n_rois} ROIs")
                 
                 # Use cluster Power 2011 network labels if available
                 cluster_power_labels = '/scratch/xxqian/roi/power264/power264NodeNames.txt'
@@ -1791,7 +1729,7 @@ def load_atlas_and_labels(
                         raise ValueError(f"Invalid number of network labels in {network_labels_path}")
                     
                     network_labels = {}
-                    for i, (label, roi_num) in enumerate(zip(network_labels_list, power.rois['roi'].values)):
+                    for i, label in enumerate(network_labels_list):
                         parts = label.rsplit('_', 1)
                         if len(parts) != 2:
                             logger.error(f"Invalid label format in {network_labels_path} at line {i+1}: {label}")
@@ -1802,9 +1740,10 @@ def load_atlas_and_labels(
                         except ValueError:
                             logger.error(f"Invalid ROI number in {network_labels_path} at line {i+1}: {txt_roi_num}")
                             raise ValueError(f"Invalid ROI number: {txt_roi_num}")
-                        if txt_roi_num != roi_num:
-                            logger.error(f"ROI number mismatch in {network_labels_path} at line {i+1}: {txt_roi_num} != {roi_num}")
-                            raise ValueError(f"ROI number mismatch: {txt_roi_num} != {roi_num}")
+                        # Simple validation: ROI number should match line number + 1
+                        expected_roi_num = i + 1
+                        if txt_roi_num != expected_roi_num:
+                            logger.warning(f"ROI number mismatch in {network_labels_path} at line {i+1}: {txt_roi_num} != {expected_roi_num}")
                         network_labels[i + 1] = network_name
                     
                     logger.info(f"Loaded {len(network_labels)} network labels from {network_labels_path}")
