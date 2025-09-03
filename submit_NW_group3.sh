@@ -8,21 +8,34 @@
 # functional connectivity group analysis using NW_group3.py. It creates
 # atlas-specific SLURM scripts and job names.
 #
+# NOTE: This script works with ALL atlases that generate ROI-to-ROI connectivity
+# data, including both network-based atlases (Power 2011, Schaefer 2018, YEO 2011)
+# and anatomical atlases (Harvard-Oxford, AAL, Talairach).
+#
 # USAGE:
 #   bash submit_NW_group3.sh [OPTIONS]
 #
 # EXAMPLES:
-#   1. Run with default Harvard-Oxford atlas (auto-detected):
-#      bash submit_NW_group3.sh
+#   1. Run with Power 2011 atlas (network-based):
+#      bash submit_NW_group3.sh --atlas power_2011
 #
-#   2. Run with specific Harvard-Oxford atlas:
+#   2. Run with Schaefer 2018 atlas (network-based):
+#      bash submit_NW_group3.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 400, "yeo_networks": 7}'
+#
+#   3. Run with YEO 2011 atlas (network-based):
+#      bash submit_NW_group3.sh --atlas yeo_2011 --atlas-params '{"n_networks": 7, "thickness": "thick"}'
+#
+#   4. Run with Harvard-Oxford atlas (anatomical):
 #      bash submit_NW_group3.sh --atlas harvard_oxford_cort-maxprob-thr25-2mm
 #
-#   3. Run with AAL atlas:
+#   5. Run with AAL atlas (anatomical):
 #      bash submit_NW_group3.sh --atlas aal
 #
-#   4. Run with Talairach atlas:
+#   6. Run with Talairach atlas (anatomical):
 #      bash submit_NW_group3.sh --atlas talairach
+#
+#   7. Auto-detect atlas:
+#      bash submit_NW_group3.sh
 #
 # OPTIONS:
 #   --atlas ATLAS            Atlas name (default: auto-detect)

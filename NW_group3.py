@@ -9,12 +9,16 @@ IMPORTANT: This script analyzes ROI-TO-ROI connectivity (individual ROI pairs).
 It requires input files with "*_roiroi_fc_avg.csv" naming pattern.
 
 SUITABLE ATLASES:
-- Anatomical atlases: Harvard-Oxford, AAL, Talairach
-- These generate *_roiroi_fc_avg.csv files
+- ALL atlases that generate *_roiroi_fc_avg.csv files:
+  * Network-based atlases: Power 2011, Schaefer 2018, YEO 2011
+  * Anatomical atlases: Harvard-Oxford, AAL, Talairach
+  * Custom atlases: Any atlas that generates ROI-to-ROI connectivity files
 
-NOT SUITABLE FOR:
-- Network-based atlases: Power 2011, Schaefer 2018, YEO 2011
-- These generate *_network_fc_avg.csv files and should use NW_group.py or NW_group2.py
+ANALYSIS TYPE:
+- ROI-to-ROI connectivity analysis (individual ROI pairs)
+- Group comparisons (HC vs OCD)
+- Longitudinal analysis (baseline vs follow-up)
+- Clinical correlation analysis
 
 Author: [Your Name]
 Date: [Current Date]
@@ -22,39 +26,40 @@ Date: [Current Date]
 USAGE EXAMPLES:
 ==============
 
-1. Harvard-Oxford Atlas (Default):
+1. Power 2011 Atlas (Network-based):
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data
+     --input_dir /path/to/fc/data \\
+     --atlas_name power_2011
 
-2. Harvard-Oxford Atlas (Specific variant):
+2. Schaefer 2018 Atlas (Network-based, 400 ROIs, 7 networks):
+   python NW_group3.py \\
+     --subjects_csv group.csv \\
+     --clinical_csv clinical.csv \\
+     --input_dir /path/to/fc/data \\
+     --atlas_name schaefer_2018_400_7_2
+
+3. YEO 2011 Atlas (Network-based, 7 networks):
+   python NW_group3.py \\
+     --subjects_csv group.csv \\
+     --clinical_csv clinical.csv \\
+     --input_dir /path/to/fc/data \\
+     --atlas_name yeo_2011_7_thick
+
+4. Harvard-Oxford Atlas (Anatomical):
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name harvard_oxford_cort-maxprob-thr25-2mm
 
-3. AAL Atlas:
+5. AAL Atlas (Anatomical):
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name aal
-
-4. Talairach Atlas:
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data \\
-     --atlas_name talairach
-
-5. With Specific Atlas Name:
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data \\
-     --atlas_name harvard_oxford_sub-maxprob-thr50-2mm
 
 6. Auto-detect Atlas:
    python NW_group3.py \\
@@ -66,16 +71,19 @@ ATLAS NAMING CONVENTIONS:
 ========================
 
 The script automatically detects atlas names from input FC files:
-- Harvard-Oxford: harvard_oxford_{atlas_name}_roiroi_fc_avg.csv
-  Examples:
-    - harvard_oxford_cort-maxprob-thr25-2mm_roiroi_fc_avg.csv
-    - harvard_oxford_sub-maxprob-thr50-2mm_roiroi_fc_avg.csv
-- AAL: aal_roiroi_fc_avg.csv
-- Talairach: talairach_roiroi_fc_avg.csv
-- Custom: custom_atlas_roiroi_fc_avg.csv (if anatomical)
+- Network-based atlases:
+  * Power 2011: power_2011_roiroi_fc_avg.csv
+  * Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution}_roiroi_fc_avg.csv
+  * YEO 2011: yeo_2011_{n_networks}_{thickness}_roiroi_fc_avg.csv
+- Anatomical atlases:
+  * Harvard-Oxford: harvard_oxford_{atlas_name}_roiroi_fc_avg.csv
+  * AAL: aal_roiroi_fc_avg.csv
+  * Talairach: talairach_roiroi_fc_avg.csv
+- Custom: custom_atlas_roiroi_fc_avg.csv
 
 IMPORTANT: This script (NW_group3.py) analyzes ROI-to-ROI connectivity and requires
-*_roiroi_fc_avg.csv input files. Only anatomical atlases generate these files.
+*_roiroi_fc_avg.csv input files. ALL atlases (both network-based and anatomical) 
+generate these files when processed by NW_1st.py.
 
 OUTPUT FILES:
 ============
@@ -130,7 +138,7 @@ warnings.filterwarnings('ignore')
 # =============================================================================
 
 DEFAULT_CONFIG = {
-    'default_atlas_name': 'harvard_oxford_cort-maxprob-thr25-2mm',
+    'default_atlas_name': 'auto',  # Auto-detect atlas from available files
     'sessions': ['baseline', 'followup'],
     'groups': ['HC', 'OCD'],
     'min_subjects_per_group': 5,
@@ -231,17 +239,38 @@ def print_examples():
 DETAILED USAGE EXAMPLES:
 ========================
 
-1. DEFAULT ATLAS (Harvard-Oxford)
-   ------------------------------
+1. POWER 2011 ATLAS (Network-based)
+   ---------------------------------
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data
+     --input_dir /path/to/fc/data \\
+     --atlas_name power_2011
    
-   Expected FC files: *_task-rest_harvard_oxford_cort-maxprob-thr25-2mm_roiroi_fc_avg.csv
+   Expected FC files: *_task-rest_power_2011_roiroi_fc_avg.csv
 
-2. SPECIFIC ATLAS NAME
-   -------------------
+2. SCHAEFER 2018 ATLAS (Network-based)
+   ------------------------------------
+   python NW_group3.py \\
+     --subjects_csv group.csv \\
+     --clinical_csv clinical.csv \\
+     --input_dir /path/to/fc/data \\
+     --atlas_name schaefer_2018_400_7_2
+   
+   Expected FC files: *_task-rest_schaefer_2018_400_7_2_roiroi_fc_avg.csv
+
+3. YEO 2011 ATLAS (Network-based)
+   -------------------------------
+   python NW_group3.py \\
+     --subjects_csv group.csv \\
+     --clinical_csv clinical.csv \\
+     --input_dir /path/to/fc/data \\
+     --atlas_name yeo_2011_7_thick
+   
+   Expected FC files: *_task-rest_yeo_2011_7_thick_roiroi_fc_avg.csv
+
+4. HARVARD-OXFORD ATLAS (Anatomical)
+   ----------------------------------
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
@@ -250,17 +279,8 @@ DETAILED USAGE EXAMPLES:
    
    Expected FC files: *_task-rest_harvard_oxford_cort-maxprob-thr25-2mm_roiroi_fc_avg.csv
 
-3. AUTO-DETECT ATLAS
-   -----------------
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data
-   
-   The script will automatically detect available atlases from the input directory.
-
-4. AAL ATLAS
-   ----------
+5. AAL ATLAS (Anatomical)
+   -----------------------
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
@@ -269,15 +289,14 @@ DETAILED USAGE EXAMPLES:
    
    Expected FC files: *_task-rest_aal_roiroi_fc_avg.csv
 
-5. TALAIRACH ATLAS
-   ---------------
+6. AUTO-DETECT ATLAS
+   -----------------
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data \\
-     --atlas_name talairach
+     --input_dir /path/to/fc/data
    
-   Expected FC files: *_task-rest_talairach_roiroi_fc_avg.csv
+   The script will automatically detect available atlases from the input directory.
 
 REQUIRED FILES:
 ---------------
@@ -337,9 +356,9 @@ def detect_atlas_name(input_dir: str, logger: logging.Logger) -> str:
         logger.warning("Input directory does not exist, using default atlas name: %s", DEFAULT_CONFIG['default_atlas_name'])
         return DEFAULT_CONFIG['default_atlas_name']
     
-    # Look for FC files with roiroi pattern (anatomical atlases)
+    # Look for FC files with roiroi pattern (all atlases generate these)
     fc_patterns = [
-        '*_task-rest_*_roiroi_fc_avg.csv',  # Anatomical atlases
+        '*_task-rest_*_roiroi_fc_avg.csv',  # All atlases (network-based and anatomical)
         '*_task-rest_*_roiroi_matrix_avg.npy'  # Matrix files
     ]
     
@@ -372,31 +391,22 @@ def detect_atlas_name(input_dir: str, logger: logging.Logger) -> str:
     return list(detected_atlases)[0]
 
 def validate_atlas_files(input_dir: str, atlas_name: str, logger: logging.Logger) -> bool:
-    """Validate that FC files exist for the specified atlas."""
+    """Validate that ROI-to-ROI FC files exist for the specified atlas."""
     if not os.path.exists(input_dir):
         logger.error("Input directory does not exist: %s", input_dir)
         return False
     
-    # Check for FC files with this atlas name (only roiroi files for anatomical atlases)
+    # Check for ROI-to-ROI FC files with this atlas name
     fc_pattern = os.path.join(input_dir, f'*_task-rest_{atlas_name}_roiroi_fc_avg.csv')
     fc_files = glob.glob(fc_pattern)
     
     if not fc_files:
-        # Check if there are network files instead (network-based atlas)
-        network_pattern = os.path.join(input_dir, f'*_task-rest_{atlas_name}_network_fc_avg.csv')
-        network_files = glob.glob(network_pattern)
-        
-        if network_files:
-            logger.error("Found network-level files for atlas '%s', but NW_group3.py requires ROI-to-ROI files", atlas_name)
-            logger.error("This atlas appears to be network-based (Power 2011, Schaefer 2018, YEO 2011)")
-            logger.error("Use NW_group.py or NW_group2.py instead for network-based atlases")
-            logger.error("Found files: %s", [os.path.basename(f) for f in network_files[:3]])
-        else:
-            logger.error("No FC files found for atlas '%s' in directory: %s", atlas_name, input_dir)
-            logger.error("Expected pattern: *_task-rest_%s_roiroi_fc_avg.csv", atlas_name)
+        logger.error("No ROI-to-ROI FC files found for atlas '%s' in directory: %s", atlas_name, input_dir)
+        logger.error("Expected pattern: *_task-rest_%s_roiroi_fc_avg.csv", atlas_name)
+        logger.error("Make sure NW_1st.py has been run to generate ROI-to-ROI connectivity files")
         return False
     
-    logger.info("Found %d FC files for atlas '%s': %s", len(fc_files), atlas_name, 
+    logger.info("Found %d ROI-to-ROI FC files for atlas '%s': %s", len(fc_files), atlas_name, 
                 [os.path.basename(f) for f in fc_files[:5]])  # Show first 5 files
     
     return True
