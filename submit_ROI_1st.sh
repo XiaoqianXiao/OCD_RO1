@@ -518,7 +518,7 @@ for subject in "${SUBJECT_ARRAY[@]}"; do
     echo "Processing subject: $subject"
     
     # Create subject-specific work directory
-    subject_work_dir="$WORK_DIR/$subject"
+     subject_work_dir="$WORK_DIR/$subject"
     mkdir -p "$subject_work_dir"
     
     # Build Python command

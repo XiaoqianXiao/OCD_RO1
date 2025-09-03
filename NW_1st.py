@@ -78,11 +78,17 @@ LABEL PATTERN TYPES:
 OUTPUT FILES:
 =============
 
+For ALL atlases:
 - {subject}_{session}_task-rest_{atlas_name}_roiroi_matrix_avg.npy: Correlation matrix
-- {subject}_{session}_task-rest_{atlas_name}_roi_fc_avg.csv: ROI-level FC (within vs between network)
+- {subject}_{session}_task-rest_{atlas_name}_roi_fc_avg.csv: ROI-level FC
 - {subject}_{session}_task-rest_{atlas_name}_roiroi_fc_avg.csv: ROI-to-ROI FC
+
+For NETWORK-BASED atlases only (Power 2011, Schaefer 2018, YEO 2011):
 - {subject}_{session}_task-rest_{atlas_name}_network_fc_avg.csv: ROI-to-network FC
 - {subject}_{session}_task-rest_{atlas_name}_network_summary_avg.csv: Network summary statistics
+
+For ANATOMICAL atlases (Harvard-Oxford, AAL, Talairach):
+- Only ROI-to-ROI connectivity files are generated (no network-level files)
 
 REQUIREMENTS:
 =============
@@ -394,11 +400,17 @@ EXAMPLES:
 
 OUTPUT FILES:
 -------------
+For ALL atlases:
 - {subject}_{session}_task-rest_{atlas_name}_roiroi_matrix_avg.npy: Correlation matrix
 - {subject}_{session}_task-rest_{atlas_name}_roi_fc_avg.csv: ROI-level FC
 - {subject}_{session}_task-rest_{atlas_name}_roiroi_fc_avg.csv: ROI-to-ROI FC
+
+For NETWORK-BASED atlases only (Power 2011, Schaefer 2018, YEO 2011):
 - {subject}_{session}_task-rest_{atlas_name}_network_fc_avg.csv: ROI-to-network FC
 - {subject}_{session}_task-rest_{atlas_name}_network_summary_avg.csv: Network summary
+
+For ANATOMICAL atlases (Harvard-Oxford, AAL, Talairach):
+- Only ROI-to-ROI connectivity files are generated (no network-level files)
 
 REQUIREMENTS:
 -------------
@@ -1359,7 +1371,8 @@ def compute_connectivity_measures(
     roi_names: List[str],
     unique_networks: List[str],
     output_prefix: str,
-    logger: logging.Logger
+    logger: logging.Logger,
+    atlas_info: Optional[Dict[str, Any]] = None
 ) -> Tuple[str, str, str, str, str]:
     """Compute all connectivity measures and save results."""
     try:
@@ -1418,12 +1431,16 @@ def compute_connectivity_measures(
                         'fc_value': np.mean(corrs)
                     })
         
-        # Save ROI-to-network FC
-        output_pairwise_csv = f"{output_prefix}_network_fc_avg.csv"
-        pairwise_df = pd.DataFrame(roi_network_fc)
-        if not pairwise_df.empty:
-            pairwise_df.to_csv(output_pairwise_csv, index=False)
-            logger.info(f"Saved ROI-to-network FC: {output_pairwise_csv}")
+        # Save ROI-to-network FC (only for network-based atlases)
+        if atlas_info is None or atlas_info.get('network_based', True):
+            output_pairwise_csv = f"{output_prefix}_network_fc_avg.csv"
+            pairwise_df = pd.DataFrame(roi_network_fc)
+            if not pairwise_df.empty:
+                pairwise_df.to_csv(output_pairwise_csv, index=False)
+                logger.info(f"Saved ROI-to-network FC: {output_pairwise_csv}")
+        else:
+            logger.info("Skipping ROI-to-network FC generation for anatomical atlas")
+            output_pairwise_csv = None
         
         # Compute ROI-level FC (within vs between network)
         logger.info("Computing ROI-level FC...")
@@ -1491,10 +1508,14 @@ def compute_connectivity_measures(
             
             network_summary.append(row)
         
-        # Save network summary
-        output_network_csv = f"{output_prefix}_network_summary.csv"
-        pd.DataFrame(network_summary).to_csv(output_network_csv, index=False)
-        logger.info(f"Saved network summary: {output_network_csv}")
+        # Save network summary (only for network-based atlases)
+        if atlas_info is None or atlas_info.get('network_based', True):
+            output_network_csv = f"{output_prefix}_network_summary.csv"
+            pd.DataFrame(network_summary).to_csv(output_network_csv, index=False)
+            logger.info(f"Saved network summary: {output_network_csv}")
+        else:
+            logger.info("Skipping network summary generation for anatomical atlas")
+            output_network_csv = None
         
         return output_matrix, output_roi_csv, output_roiroi_csv, output_pairwise_csv, output_network_csv
         
@@ -1514,7 +1535,8 @@ def process_run(
     output_prefix: str,
     work_dir: str,
     network_labels: Dict[int, str],
-    logger: logging.Logger
+    logger: logging.Logger,
+    atlas_info: Optional[Dict[str, Any]] = None
 ) -> Optional[Tuple[str, str, str, str, str]]:
     """Process a single fMRI run to compute functional connectivity."""
     try:
@@ -1569,7 +1591,7 @@ def process_run(
         unique_networks = sorted(set(network_labels.values()) - {'Unknown'})
         
         results = compute_connectivity_measures(
-            time_series, network_labels, roi_names, unique_networks, output_prefix, logger
+            time_series, network_labels, roi_names, unique_networks, output_prefix, logger, atlas_info
         )
         
         logger.info(f"Run processing completed successfully")
@@ -1709,7 +1731,7 @@ def load_atlas_and_labels(
     label_pattern: str = 'power',
     custom_regex: str = None,
     logger: logging.Logger = None
-) -> Tuple[Any, Dict[int, str], str]:
+) -> Tuple[Any, Dict[int, str], str, Optional[Dict[str, Any]]]:
     """Load atlas and network labels, returning atlas image, network labels, and atlas name."""
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -1787,7 +1809,7 @@ def load_atlas_and_labels(
                 raise
             
             logger.info(f"Loaded Power 2011 atlas: 264 ROIs, {len(set(network_labels.values()))} networks")
-            return atlas_img, network_labels, 'power_2011'
+            return atlas_img, network_labels, 'power_2011', NILEARN_ATLASES['power_2011']
         
         # For all other Nilearn atlases, use the normal fetch function
         logger.info(f"Fetching Nilearn atlas: {atlas_spec}")
@@ -1813,7 +1835,7 @@ def load_atlas_and_labels(
         else:
             atlas_name = atlas_spec
         
-        return atlas_img, network_labels, atlas_name
+        return atlas_img, network_labels, atlas_name, NILEARN_ATLASES.get(atlas_name)
     
     else:
         # Custom atlas file
@@ -1840,7 +1862,7 @@ def load_atlas_and_labels(
         else:
             atlas_name = os.path.splitext(os.path.basename(atlas_spec))[0]
         
-        return atlas_img, network_labels, atlas_name
+        return atlas_img, network_labels, atlas_name, None
 
 # =============================================================================
 # MAIN EXECUTION
@@ -1917,7 +1939,7 @@ def main():
     if args.work_dir:
         config['work_dir'] = args.work_dir
     
-    # Setup logging
+    # Setup initial logging (will be updated with atlas name after detection)ls
     logger = setup_logging(config['log_file'])
     if args.verbose:
         logger.setLevel(logging.DEBUG)
@@ -1947,35 +1969,45 @@ def main():
         
         # Load atlas and network labels
         logger.info("Setting up atlas and network labels...")
-        atlas_img, network_labels, atlas_name = load_atlas_and_labels(
+        atlas_img, network_labels, atlas_name, atlas_info = load_atlas_and_labels(
             args.atlas, args.atlas_params, args.labels, args.label_pattern, args.custom_regex, logger
         )
         
-        logger.info(f"Atlas loaded: shape={atlas_img.shape}, ROIs={len(network_labels)}")
-        logger.info(f"Network labels: {len(set(network_labels.values()))} unique networks")
+        # Update log file name to include atlas name
+        log_dir = os.path.dirname(config['log_file'])
+        atlas_log_file = os.path.join(log_dir, f'roi_to_roi_fc_analysis_{atlas_name}.log')
+        logger.info("Switching to atlas-specific log file: %s", atlas_log_file)
+        
+        # Create new logger with atlas-specific log file
+        atlas_logger = setup_logging(atlas_log_file)
+        if args.verbose:
+            atlas_logger.setLevel(logging.DEBUG)
+        
+        atlas_logger.info(f"Atlas loaded: shape={atlas_img.shape}, ROIs={len(network_labels)}")
+        atlas_logger.info(f"Network labels: {len(set(network_labels.values()))} unique networks")
         
         # Process each session
         subjects = [args.subject]
         processed_any = False
         
         for subject in subjects:
-            logger.info(f"Processing subject: {subject}")
+            atlas_logger.info(f"Processing subject: {subject}")
             
             for session in ANALYSIS_PARAMS['sessions']:
                 try:
-                    logger.info(f"Processing session: {session}")
+                    atlas_logger.info(f"Processing session: {session}")
                     
                     # Validate paths
-                    paths = validate_paths(subject, session, config['bids_dir'], logger)
+                    paths = validate_paths(subject, session, config['bids_dir'], atlas_logger)
                     if not paths:
-                        logger.warning(f"Skipping session {session} for {subject}")
+                        atlas_logger.warning(f"Skipping session {session} for {subject}")
                         continue
                     
                     brain_mask_path, fmri_file, confounds_file = paths
                     
                     # Extract run ID
                     run_id = extract_run_id(fmri_file)
-                    logger.info(f"Run ID: {run_id}")
+                    atlas_logger.info(f"Run ID: {run_id}")
                     
                     # Define output prefix
                     output_prefix = os.path.join(
@@ -1986,39 +2018,44 @@ def main():
                     # Process the run
                     result = process_run(
                         fmri_file, confounds_file, atlas_img, brain_mask_path,
-                        output_prefix, config['work_dir'], network_labels, logger
+                        output_prefix, config['work_dir'], network_labels, atlas_logger, atlas_info
                     )
                     
                     if result:
                         # Rename output files to indicate they are from single runs
                         src_matrix, src_roi_csv, src_roiroi_csv, src_pairwise_csv, src_network_csv = result
                         
-                        # Move files to final locations
+                        # Move files to final locations (only move files that were generated)
                         file_moves = [
                             (src_matrix, f'{subject}_{session}_task-rest_{atlas_name}_roiroi_matrix_avg.npy'),
                             (src_roi_csv, f'{subject}_{session}_task-rest_{atlas_name}_roi_fc_avg.csv'),
-                            (src_roiroi_csv, f'{subject}_{session}_task-rest_{atlas_name}_roiroi_fc_avg.csv'),
-                            (src_pairwise_csv, f'{subject}_{session}_task-rest_{atlas_name}_network_fc_avg.csv'),
-                            (src_network_csv, f'{subject}_{session}_task-rest_{atlas_name}_network_summary_avg.csv')
+                            (src_roiroi_csv, f'{subject}_{session}_task-rest_{atlas_name}_roiroi_fc_avg.csv')
                         ]
                         
+                        # Only add network files if they were generated (for network-based atlases)
+                        if src_pairwise_csv is not None:
+                            file_moves.append((src_pairwise_csv, f'{subject}_{session}_task-rest_{atlas_name}_network_fc_avg.csv'))
+                        if src_network_csv is not None:
+                            file_moves.append((src_network_csv, f'{subject}_{session}_task-rest_{atlas_name}_network_summary_avg.csv'))
+                        
                         for src, dst_name in file_moves:
-                            dst_path = os.path.join(config['output_dir'], dst_name)
-                            os.rename(src, dst_path)
-                            logger.info(f"Moved {os.path.basename(src)} to {dst_name}")
+                            if src is not None:  # Only move if file was generated
+                                dst_path = os.path.join(config['output_dir'], dst_name)
+                                os.rename(src, dst_path)
+                                atlas_logger.info(f"Moved {os.path.basename(src)} to {dst_name}")
                         
                         processed_any = True
                     else:
-                        logger.warning(f"No results generated for {subject} {session}")
+                        atlas_logger.warning(f"No results generated for {subject} {session}")
                 
                 except Exception as e:
-                    logger.error(f"Failed to process {subject} {session}: {str(e)}")
+                    atlas_logger.error(f"Failed to process {subject} {session}: {str(e)}")
                     continue
         
         if not processed_any:
-            logger.error(f"No functional connectivity matrices generated for {args.subject}")
+            atlas_logger.error(f"No functional connectivity matrices generated for {args.subject}")
         else:
-            logger.info(f"Analysis completed successfully for {args.subject} using atlas: {atlas_name}")
+            atlas_logger.info(f"Analysis completed successfully for {args.subject} using atlas: {atlas_name}")
     
     except Exception as e:
         logger.error(f"Main function failed: {str(e)}")

@@ -177,7 +177,7 @@ echo "Subjects found: ${#SUBJECTS[@]}"
 
 # Loop over subjects and submit a job for each
 for SUBJECT in "${SUBJECTS[@]}"; do
-    JOB_NAME="NW_1st_${SUBJECT}"
+    JOB_NAME="NW_1st_${SUBJECT}_${ATLAS}"
     JOB_SCRIPT="$TEMP_JOB_DIR/${JOB_NAME}.slurm"
 
     # Extract subject ID without 'sub-' prefix
