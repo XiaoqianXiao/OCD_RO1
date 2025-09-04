@@ -841,8 +841,8 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
         # Fetch the atlas
         try:
             # Special handling for older YEO 2011 version
-            if atlas_name == 'yeo_2011' and not params:
-                atlas_data = fetch_func()
+            if atlas_name == 'yeo_2011':
+                atlas_data = fetch_func()  # Older version doesn't accept parameters
             else:
                 atlas_data = fetch_func(**params)
         except OSError as e:
