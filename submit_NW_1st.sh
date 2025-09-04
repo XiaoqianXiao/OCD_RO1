@@ -38,11 +38,11 @@
 #   6. Submit with custom label pattern for Power 2011:
 #      bash submit_NW_1st.sh --atlas power_2011 --label-pattern custom --custom-regex "network_(\\d+)_(.+)"
 #
-#   7. Submit with Yeo 2011 atlas (7 networks):
-#      bash submit_NW_1st.sh --atlas yeo_2011 --atlas-params '{"n_networks": 7, "thickness": "thick"}'
+#   7. Submit with Yeo 2011 atlas (uses default 7-network thick parcellation):
+#      bash submit_NW_1st.sh --atlas yeo_2011
 #
-#   8. Submit with Yeo 2011 atlas (17 networks):
-#      bash submit_NW_1st.sh --atlas yeo_2011 --atlas-params '{"n_networks": 17, "thickness": "thick"}'
+#   Note: YEO 2011 uses default parcellation in older Nilearn versions (0.10.4)
+#   Parameters are ignored and the atlas uses 7-network thick parcellation
 #
 # OPTIONS:
 #   --atlas ATLAS            Atlas name (default: power_2011)
@@ -68,8 +68,9 @@
 #   - talairach: Talairach atlas (1107 ROIs)
 #     * High-resolution anatomical parcellation
 #     * Best for: Detailed anatomical analysis
-#   - yeo_2011: Yeo 2011 network parcellation (7/17 networks)
-#     * Pure network-based parcellation with n_networks and thickness parameters
+#   - yeo_2011: Yeo 2011 network parcellation (7 networks, thick)
+#     * Uses default 7-network thick parcellation (older Nilearn 0.10.4)
+#     * Parameters are ignored - always uses default parcellation
 #     * Best for: Network-focused analysis
 #
 # LABEL PATTERNS:
