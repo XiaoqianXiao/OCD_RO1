@@ -307,12 +307,9 @@ if 'fetch_atlas_pauli_2017' in globals() and fetch_atlas_pauli_2017 is not None:
 if 'fetch_atlas_yeo_2011' in globals():
     NILEARN_ATLASES['yeo_2011'] = {
         'function': fetch_atlas_yeo_2011,
-        'default_params': {'n_networks': 7, 'thickness': 'thick'},
+        'default_params': {},  # Older version doesn't accept parameters
         'description': 'Yeo 2011 network parcellation (7 or 17 networks)',
-        'param_options': {
-            'n_networks': [7, 17],
-            'thickness': ['thick', 'thin']
-        },
+        'param_options': {},  # No parameters for older version
         'network_based': True
     }
 
@@ -501,12 +498,10 @@ DETAILED USAGE EXAMPLES
    python NW_1st.py \\
      --subject sub-AOCD001 \\
      --atlas yeo_2011 \\
-     --atlas-params '{"n_networks": 17}' \\
      --label-pattern nilearn
    
-   Available parameters:
-   - n_networks: 7 or 17
-   - thickness: 'thick' or 'thin'
+   Note: Older Nilearn versions don't support parameters for YEO 2011.
+   The atlas will use the default 7-network thick parcellation.
 
 5. CUSTOM ATLAS WITH NETWORK LABELS
    --------------------------------
@@ -845,7 +840,11 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
         
         # Fetch the atlas
         try:
-            atlas_data = fetch_func(**params)
+            # Special handling for older YEO 2011 version
+            if atlas_name == 'yeo_2011' and not params:
+                atlas_data = fetch_func()
+            else:
+                atlas_data = fetch_func(**params)
         except OSError as e:
             error_msg = str(e)
             if "File exists" in error_msg or "nilearn_data" in error_msg:
@@ -880,7 +879,21 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
         
         # Load the atlas image
         try:
-            atlas_img = image.load_img(atlas_data['maps'])
+            # Special handling for older YEO 2011 version
+            if atlas_name == 'yeo_2011' and 'maps' not in atlas_data:
+                # Older version returns different keys
+                if 'thick_7' in atlas_data:
+                    atlas_img = image.load_img(atlas_data['thick_7'])
+                    atlas_data['maps'] = atlas_data['thick_7']
+                    atlas_data['labels'] = atlas_data.get('colors_7', [])
+                elif 'thick_17' in atlas_data:
+                    atlas_img = image.load_img(atlas_data['thick_17'])
+                    atlas_data['maps'] = atlas_data['thick_17']
+                    atlas_data['labels'] = atlas_data.get('colors_17', [])
+                else:
+                    raise ValueError("No suitable YEO 2011 atlas found in data")
+            else:
+                atlas_img = image.load_img(atlas_data['maps'])
         except Exception as e:
             logger.error(f"Failed to load atlas image: {str(e)}")
             raise
