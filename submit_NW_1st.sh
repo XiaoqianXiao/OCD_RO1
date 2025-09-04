@@ -184,13 +184,44 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     # Extract subject ID without 'sub-' prefix
     SUBJECT_ID=${SUBJECT#sub-}
 
+    # Set optimal memory allocation based on atlas type and configuration
+    case "$ATLAS" in
+        "yeo_2011")
+            MEMORY="32G"  # YEO 2011 needs 32GB due to complex processing
+            ;;
+        "schaefer_2018")
+            # Check if specific ROI count is provided in atlas-params
+            if [[ "$ATLAS_PARAMS" == *"n_rois\": 100"* ]]; then
+                MEMORY="8G"   # 100 ROIs: 8GB sufficient (proven successful)
+            elif [[ "$ATLAS_PARAMS" == *"n_rois\": 200"* ]] || [[ "$ATLAS_PARAMS" == *"n_rois\": 300"* ]]; then
+                MEMORY="16G"  # 200-300 ROIs: 16GB
+            elif [[ "$ATLAS_PARAMS" == *"n_rois\": 400"* ]] || [[ "$ATLAS_PARAMS" == *"n_rois\": 500"* ]] || [[ "$ATLAS_PARAMS" == *"n_rois\": 600"* ]]; then
+                MEMORY="24G"  # 400-600 ROIs: 24GB
+            else
+                MEMORY="32G"  # 700+ ROIs: 32GB (default for large configurations)
+            fi
+            ;;
+        "power_2011")
+            MEMORY="16G"  # Power 2011 (264 ROIs): 16GB sufficient
+            ;;
+        "harvard_oxford"|"aal"|"talairach")
+            MEMORY="8G"   # Anatomical atlases: 8GB sufficient
+            ;;
+        *)
+            MEMORY="16G"  # Default for unknown atlases
+            ;;
+    esac
+
+    # Log memory allocation decision
+    echo "Memory allocation for ${ATLAS}: ${MEMORY}"
+
     # Create SLURM job script
     cat > "$JOB_SCRIPT" << EOF
 #!/bin/bash
 #SBATCH --job-name=${JOB_NAME}
 #SBATCH --output=${LOG_DIR}/${JOB_NAME}_%j.out
 #SBATCH --error=${LOG_DIR}/${JOB_NAME}_%j.err
-#SBATCH --mem=8G
+#SBATCH --mem=${MEMORY}
 #SBATCH --time=01:00:00
 #SBATCH --cpus-per-task=1
 #SBATCH --account=def-jfeusner

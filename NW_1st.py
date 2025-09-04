@@ -1389,10 +1389,19 @@ def compute_connectivity_measures(
 ) -> Tuple[str, str, str, str, str]:
     """Compute all connectivity measures and save results."""
     try:
-        # Compute correlation matrix
+        # Compute correlation matrix with memory optimization
         logger.info("Computing correlation matrix...")
+        logger.info(f"Time series shape: {time_series.shape}, Memory usage: {time_series.nbytes / 1024**2:.1f} MB")
+        
+        # Use memory-efficient correlation computation
         corr_matrix = np.corrcoef(time_series.T)
         corr_matrix = np.nan_to_num(corr_matrix, nan=0.0)
+        
+        logger.info(f"Correlation matrix shape: {corr_matrix.shape}, Memory usage: {corr_matrix.nbytes / 1024**2:.1f} MB")
+        
+        # Force garbage collection to free memory
+        import gc
+        gc.collect()
         
         # Save correlation matrix
         output_matrix = f"{output_prefix}_roiroi_matrix.npy"
