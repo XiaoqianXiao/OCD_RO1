@@ -16,7 +16,7 @@
 #   bash submit_NW_group3.sh [OPTIONS]
 #
 # EXAMPLES:
-#   1. Run with Power 2011 atlas (network-based):
+#   1. lea
 #      bash submit_NW_group3.sh --atlas power_2011
 #
 #   2. Run with Schaefer 2018 atlas (network-based):
@@ -196,7 +196,7 @@ echo "  $AUTO_DETECT_ATLAS \\"
 echo "  $NO_FDR \\"
 echo "  $VERBOSE \\"
 echo "  $([ -n "$ATLAS" ] && echo "--atlas_name $ATLAS") \\"
-echo "  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params \\\"$ATLAS_PARAMS\\\"")"
+echo "  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params '$ATLAS_PARAMS'")"
 echo "=========================================="
 
 # Execute the analysis
@@ -211,7 +211,7 @@ apptainer exec \$CONTAINER python NW_group3.py \\
   $NO_FDR \\
   $VERBOSE \\
   $([ -n "$ATLAS" ] && echo "--atlas_name $ATLAS") \\
-  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params \\\"$ATLAS_PARAMS\\\"")
+  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params '$ATLAS_PARAMS'")
 
 # Check exit status
 EXIT_STATUS=\$?
