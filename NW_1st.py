@@ -308,7 +308,7 @@ if 'fetch_atlas_yeo_2011' in globals():
     NILEARN_ATLASES['yeo_2011'] = {
         'function': fetch_atlas_yeo_2011,
         'default_params': {},  # Older version doesn't accept parameters
-        'description': 'Yeo 2011 network parcellation (7 or 17 networks)',
+        'description': 'Yeo 2011 network parcellation (121 ROIs, 7 networks)',
         'param_options': {},  # No parameters for older version
         'network_based': True
     }
@@ -493,7 +493,7 @@ DETAILED USAGE EXAMPLES
 
 4. YEO 2011 ATLAS (Built-in Nilearn)
    ----------------------------------
-   This atlas provides 7 or 17 network parcellations.
+   This atlas provides 121 ROIs across 7 networks.
    
    python NW_1st.py \\
      --subject sub-AOCD001 \\
@@ -501,9 +501,16 @@ DETAILED USAGE EXAMPLES
      --label-pattern nilearn
    
    Note: Older Nilearn versions don't support parameters for YEO 2011.
-   The atlas will use the default 7-network thick parcellation.
+   The atlas will use the default 7-network parcellation with 121 ROIs.
 
-5. CUSTOM ATLAS WITH NETWORK LABELS
+5. Schaefer 2018 Atlas (Alternative for Yeo networks):
+   python NW_1st.py \\
+     --subject sub-AOCD001 \\
+     --atlas schaefer_2018 \\
+     --atlas-params '{"n_rois": 400, "yeo_networks": 7, "resolution_mm": 2}' \\
+     --label-pattern nilearn
+
+6. CUSTOM ATLAS WITH NETWORK LABELS
    --------------------------------
    For atlases with custom network label formats.
    
@@ -881,8 +888,26 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
         try:
             # Special handling for older YEO 2011 version
             if atlas_name == 'yeo_2011' and 'maps' not in atlas_data:
-                # Older version returns different keys
-                if 'thick_7' in atlas_data:
+                # Use the 'anat' key which contains the ROI-level parcellation (121 ROIs)
+                if 'anat' in atlas_data:
+                    logger.info("Using YEO 2011 ROI-level parcellation from 'anat' key (121 ROIs)")
+                    atlas_img = image.load_img(atlas_data['anat'])
+                    atlas_data['maps'] = atlas_data['anat']
+                    # Load actual labels from the color file
+                    try:
+                        with open(atlas_data['colors_7'], 'r') as f:
+                            color_lines = [line.strip() for line in f if line.strip()]
+                        # Extract labels from color file format: "1     7Networks_1 120  18 134   0"
+                        labels = []
+                        for line in color_lines[1:]:  # Skip header line
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                labels.append(parts[1])  # Extract the label part
+                        atlas_data['labels'] = labels
+                    except Exception as e:
+                        logger.warning(f"Failed to load YEO 2011 labels from {atlas_data['colors_7']}: {e}")
+                        atlas_data['labels'] = []
+                elif 'thick_7' in atlas_data:
                     atlas_img = image.load_img(atlas_data['thick_7'])
                     atlas_data['maps'] = atlas_data['thick_7']
                     # Load actual labels from the color file

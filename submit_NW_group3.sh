@@ -196,7 +196,7 @@ echo "  $AUTO_DETECT_ATLAS \\"
 echo "  $NO_FDR \\"
 echo "  $VERBOSE \\"
 echo "  $([ -n "$ATLAS" ] && echo "--atlas_name $ATLAS") \\"
-echo "  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params '$ATLAS_PARAMS'")"
+echo "  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params \"$ATLAS_PARAMS\"")"
 echo "=========================================="
 
 # Execute the analysis
@@ -211,7 +211,7 @@ apptainer exec \$CONTAINER python NW_group3.py \\
   $NO_FDR \\
   $VERBOSE \\
   $([ -n "$ATLAS" ] && echo "--atlas_name $ATLAS") \\
-  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params '$ATLAS_PARAMS'")
+  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params \"$ATLAS_PARAMS\"")
 
 # Check exit status
 EXIT_STATUS=\$?
