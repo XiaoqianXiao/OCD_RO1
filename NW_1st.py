@@ -885,11 +885,37 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
                 if 'thick_7' in atlas_data:
                     atlas_img = image.load_img(atlas_data['thick_7'])
                     atlas_data['maps'] = atlas_data['thick_7']
-                    atlas_data['labels'] = atlas_data.get('colors_7', [])
+                    # Load actual labels from the color file
+                    try:
+                        with open(atlas_data['colors_7'], 'r') as f:
+                            color_lines = [line.strip() for line in f if line.strip()]
+                        # Extract labels from color file format: "1     7Networks_1 120  18 134   0"
+                        labels = []
+                        for line in color_lines[1:]:  # Skip header line
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                labels.append(parts[1])  # Extract the label part
+                        atlas_data['labels'] = labels
+                    except Exception as e:
+                        logger.warning(f"Failed to load YEO 2011 labels from {atlas_data['colors_7']}: {e}")
+                        atlas_data['labels'] = []
                 elif 'thick_17' in atlas_data:
                     atlas_img = image.load_img(atlas_data['thick_17'])
                     atlas_data['maps'] = atlas_data['thick_17']
-                    atlas_data['labels'] = atlas_data.get('colors_17', [])
+                    # Load actual labels from the color file
+                    try:
+                        with open(atlas_data['colors_17'], 'r') as f:
+                            color_lines = [line.strip() for line in f if line.strip()]
+                        # Extract labels from color file format: "1    17Networks_1 120  18 134   0"
+                        labels = []
+                        for line in color_lines[1:]:  # Skip header line
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                labels.append(parts[1])  # Extract the label part
+                        atlas_data['labels'] = labels
+                    except Exception as e:
+                        logger.warning(f"Failed to load YEO 2011 labels from {atlas_data['colors_17']}: {e}")
+                        atlas_data['labels'] = []
                 else:
                     raise ValueError("No suitable YEO 2011 atlas found in data")
             else:
@@ -1338,6 +1364,11 @@ def extract_time_series(
         # Extract full time series
         full_time_series = masker_no_confounds.fit_transform(fmri_img)
         logger.info(f"Full time series shape: {full_time_series.shape}")
+        logger.info(f"Time series memory usage: {full_time_series.nbytes / 1024**2:.1f} MB")
+        
+        # Force garbage collection after extraction
+        import gc
+        gc.collect()
         
         # Step 2: Censor high-motion volumes from BOLD data
         logger.info(f"Step 2: Censoring high-motion volumes")
@@ -1378,6 +1409,43 @@ def extract_time_series(
         logger.error(f"Failed to extract time series: {str(e)}")
         return None
 
+def compute_correlation_chunked(time_series: np.ndarray, logger: logging.Logger) -> np.ndarray:
+    """Compute correlation matrix using chunked processing to reduce memory usage."""
+    n_rois = time_series.shape[1]
+    chunk_size = 50  # Process 50 ROIs at a time
+    
+    logger.info(f"Using chunked correlation computation: {n_rois} ROIs, chunk size: {chunk_size}")
+    
+    # Initialize correlation matrix
+    corr_matrix = np.zeros((n_rois, n_rois))
+    
+    # Process in chunks
+    for i in range(0, n_rois, chunk_size):
+        end_i = min(i + chunk_size, n_rois)
+        chunk_i = time_series[:, i:end_i]
+        
+        for j in range(0, n_rois, chunk_size):
+            end_j = min(j + chunk_size, n_rois)
+            chunk_j = time_series[:, j:end_j]
+            
+            # Compute correlation for this chunk
+            chunk_corr = np.corrcoef(chunk_i.T, chunk_j.T)
+            
+            # Handle the case where we're computing within the same chunk
+            if i == j:
+                corr_matrix[i:end_i, i:end_i] = chunk_corr
+            else:
+                corr_matrix[i:end_i, j:end_j] = chunk_corr
+                corr_matrix[j:end_j, i:end_i] = chunk_corr.T
+            
+            # Force garbage collection after each chunk
+            import gc
+            gc.collect()
+        
+        logger.info(f"Processed chunk {i//chunk_size + 1}/{(n_rois + chunk_size - 1)//chunk_size}")
+    
+    return corr_matrix
+
 def compute_connectivity_measures(
     time_series: np.ndarray,
     network_labels: Dict[int, str],
@@ -1389,18 +1457,23 @@ def compute_connectivity_measures(
 ) -> Tuple[str, str, str, str, str]:
     """Compute all connectivity measures and save results."""
     try:
-        # Compute correlation matrix with memory optimization
+        # Compute correlation matrix with aggressive memory optimization
         logger.info("Computing correlation matrix...")
         logger.info(f"Time series shape: {time_series.shape}, Memory usage: {time_series.nbytes / 1024**2:.1f} MB")
         
-        # Use memory-efficient correlation computation
+        # Use standard correlation computation
         corr_matrix = np.corrcoef(time_series.T)
+        
         corr_matrix = np.nan_to_num(corr_matrix, nan=0.0)
         
         logger.info(f"Correlation matrix shape: {corr_matrix.shape}, Memory usage: {corr_matrix.nbytes / 1024**2:.1f} MB")
         
-        # Force garbage collection to free memory
+        # Aggressive memory cleanup
         import gc
+        gc.collect()
+        
+        # Clear intermediate variables
+        del time_series
         gc.collect()
         
         # Save correlation matrix

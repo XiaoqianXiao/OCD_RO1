@@ -187,7 +187,7 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     # Set optimal memory allocation based on atlas type and configuration
     case "$ATLAS" in
         "yeo_2011")
-            MEMORY="32G"  # YEO 2011 needs 32GB due to complex processing
+            MEMORY="16G"  # YEO 2011 needs 16GB due to label processing fix
             ;;
         "schaefer_2018")
             # Check if specific ROI count is provided in atlas-params
