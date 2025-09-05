@@ -200,8 +200,8 @@ apptainer exec \$CONTAINER python NW_group.py \\
   $AUTO_DETECT_ATLAS \\
   $NO_FDR \\
   $VERBOSE \\
-  $([ -n "$ATLAS" ] && echo "--atlas_name $ATLAS") \\
-  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params '$ATLAS_PARAMS'")
+  \$([ -n "\$ATLAS" ] && echo "--atlas_name \$ATLAS") \\
+  \$([ -n "\$ATLAS_PARAMS" ] && echo "--atlas_params '\$ATLAS_PARAMS'")
 
 # Check exit status
 EXIT_STATUS=\$?
