@@ -191,7 +191,7 @@ echo "  \$([ -n \"\${ATLAS_PARAMS}\" ] && echo \"--atlas_params \${ATLAS_PARAMS}
 echo "=========================================="
 
 # Execute the analysis
-apptainer exec \$CONTAINER python NW_group.py \\
+apptainer exec $CONTAINER python NW_group.py \\
   --subjects_csv "\${SUBJECTS_CSV}" \\
   --clinical_csv "\${CLINICAL_CSV}" \\
   --input_dir "\${INPUT_DIR}" \\
@@ -205,23 +205,23 @@ apptainer exec \$CONTAINER python NW_group.py \\
   \$([ -n \"\${ATLAS_PARAMS}\" ] && echo \"--atlas_params \${ATLAS_PARAMS}\")
 
 # Check exit status
-EXIT_STATUS=\$?
+EXIT_STATUS=$?
 
 echo "=========================================="
-echo "Job completed at: \$(date)"
-echo "Exit status: \$EXIT_STATUS"
+echo "Job completed at: $(date)"
+echo "Exit status: $EXIT_STATUS"
 
-if [ \$EXIT_STATUS -eq 0 ]; then
+if [ $EXIT_STATUS -eq 0 ]; then
     echo "SUCCESS: ROI-to-network FC group analysis completed successfully"
-    echo "Results saved to: $OUTPUT_DIR"
-    echo "Log files saved to: $OUTPUT_DIR/roi_network_group_analysis_*.log"
+    echo "Results saved to: \${OUTPUT_DIR}"
+    echo "Log files saved to: \${OUTPUT_DIR}/roi_network_group_analysis_*.log"
 else
-    echo "ERROR: ROI-to-network FC group analysis failed with exit status \$EXIT_STATUS"
-    echo "Check log files for details: $OUTPUT_DIR/roi_network_group_analysis_*.log"
+    echo "ERROR: ROI-to-network FC group analysis failed with exit status $EXIT_STATUS"
+    echo "Check log files for details: \${OUTPUT_DIR}/roi_network_group_analysis_*.log"
 fi
 
 echo "=========================================="
-exit \$EXIT_STATUS
+exit $EXIT_STATUS
 TEMPLATE_EOF
 
 # Replace template variables
