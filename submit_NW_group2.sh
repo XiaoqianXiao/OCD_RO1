@@ -140,11 +140,11 @@ echo "Job name: $JOB_NAME"
 echo "Atlas: $ATLAS_NAME"
 
 # Create the SLURM job script
-cat > "$JOB_SCRIPT" << EOF
+cat > "$JOB_SCRIPT" << 'TEMPLATE_EOF'
 #!/bin/bash
-#SBATCH --job-name=${JOB_NAME}
-#SBATCH --output=/scratch/xxqian/logs/NWGroup2_${ATLAS_NAME}_%j.out
-#SBATCH --error=/scratch/xxqian/logs/NWGroup2_${ATLAS_NAME}_%j.err
+#SBATCH --job-name=__JOB_NAME__
+#SBATCH --output=/scratch/xxqian/logs/NWGroup2___ATLAS_NAME__%j.out
+#SBATCH --error=/scratch/xxqian/logs/NWGroup2___ATLAS_NAME__%j.err
 #SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -197,7 +197,7 @@ echo "Job completed at: \$(date)"
 echo "Exit status: \$EXIT_STATUS"
 
 if [ \$EXIT_STATUS -eq 0 ]; then
-    echo "SUCCESS: Network-level FC group analysis completed successfully"
+fr    echo "SUCCESS: Network-level FC group analysis completed successfully"
     echo "Results saved to: $OUTPUT_DIR"
     echo "Log files saved to: $OUTPUT_DIR/network_level_group_analysis_*.log"
 else
@@ -207,7 +207,11 @@ fi
 
 echo "=========================================="
 exit \$EXIT_STATUS
-EOF
+TEMPLATE_EOF
+
+# Replace placeholders
+sed -i "s|__JOB_NAME__|$JOB_NAME|g" "$JOB_SCRIPT"
+sed -i "s|__ATLAS_NAME__|$ATLAS_NAME|g" "$JOB_SCRIPT"
 
 # Submit the job
 echo "Submitting job: $JOB_NAME"
