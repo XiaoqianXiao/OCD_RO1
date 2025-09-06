@@ -31,8 +31,8 @@ ATLAS_PARAMS=${2:-'{}'}  # Default to empty JSON if not provided
 
 # SLURM Configuration
 #SBATCH --job-name=roi_network_fc_group_${ATLAS}
-#SBATCH --output=/scratch/xxqian/logs/ROINetworkGroup_${ATLAS}_%A_%a.out
-#SBATCH --error=/scratch/xxqian/logs/ROINetworkGroup_${ATLAS}_%A_%a.err
+#SBATCH --output=/scratch/xxqian/logs/ROINetworkGroup_${ATLAS}_%A.out
+#SBATCH --error=/scratch/xxqian/logs/ROINetworkGroup_${ATLAS}_%A.err
 #SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
