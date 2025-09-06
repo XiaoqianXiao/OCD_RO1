@@ -55,7 +55,9 @@ SCRATCH_DIR="/scratch/xxqian"
 OUTPUT_DIR="${SCRATCH_DIR}/OCD/NW_group"
 SUBJECTS_CSV="${PROJECT_DIR}/metadata/shared_demographics.csv"
 CLINICAL_CSV="${SCRATCH_DIR}/OCD/behav/clinical.csv"
-INPUT_DIR="${SCRATCH_DIR}/OCD/NW_1st"
+INPUT_DIR="${SCRATCH_DIR}/OCD/NW_1stLevel"
+
+
 
 # Bind directories
 APPTAINER_BIND="/scratch/xxqian/repo/OCD_RO1/NW_group.py:/app/NW_group.py,${SCRATCH_DIR}/OCD:/output,${PROJECT_DIR}/metadata:/metadata,${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv,${INPUT_DIR}:/input"
@@ -71,17 +73,6 @@ done
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"
 
-# Print job information
-echo "=========================================="
-echo "ROI-to-Network FC Group Analysis"
-echo "=========================================="
-echo "Job ID: $SLURM_JOB_ID"
-echo "Node: $SLURM_NODELIST"
-echo "Start time: $(date)"
-echo "Atlas: $ATLAS"
-echo "Input directory: $INPUT_DIR"
-echo "Output directory: $OUTPUT_DIR"
-echo "=========================================="
 
 # Run the Python script inside the Apptainer container
 echo "Starting ROI-to-Network FC group analysis..."
