@@ -8,11 +8,7 @@
 #
 # EXAMPLES FOR ROI-TO-NETWORK SIMILARITY ANALYSIS:
 #
-# 1. Schaefer 2018 Atlas (Network-based):
-#    sbatch submit_NW_group_roi_network.sh schaefer_2018
-#    sbatch submit_NW_group_roi_network.sh schaefer_2018 '{"n_rois": 100, "yeo_networks": 7, "resolution_mm": 2}'
-#    sbatch submit_NW_group_roi_network.sh schaefer_2018 '{"n_rois": 400, "yeo_networks": 17, "resolution_mm": 1}'
-#    sbatch submit_NW_group_roi_network.sh schaefer_2018 '{"n_rois": 1000, "yeo_networks": 7, "resolution_mm": 2}'
+# 
 #
 # 2. Power 2011 Atlas (Network-based):
 #    sbatch submit_NW_group_roi_network.sh power_2011
@@ -22,6 +18,10 @@
 #
 # 4. Yeo 2011 Atlas (Network-based, Network-level only):
 #    sbatch submit_NW_group_roi_network.sh yeo_2011
+#
+# 5. Custom Atlas Names (if using pre-configured atlas names):
+#    sbatch submit_NW_group_roi_network.sh schaefer_2018_100_7_2
+#    sbatch submit_NW_group_roi_network.sh schaefer_2018_400_17_1
 #
 # NOTE: Only network-based atlases support ROI-to-Network similarity analysis.
 # Non-network atlases (harvard_oxford, aal, talairach) are not suitable for this analysis.
@@ -60,7 +60,7 @@ INPUT_DIR="${SCRATCH_DIR}/OCD/NW_1st"
 
 
 # Bind directories
-APPTAINER_BIND="/scratch/xxqian/repo/OCD_RO1/NW_group.py:/app/NW_group.py,${PROJECT_DIR}/metadata:/metadata,${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv,${INPUT_DIR}:/input,${OUTPUT_DIR}:/output"
+APPTAINER_BIND="/scratch/xxqian/repo/OCD_RO1/NW_group.py:/app/NW_group.py,${SCRATCH_DIR}/OCD:/output,${PROJECT_DIR}/metadata:/metadata,${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv,${INPUT_DIR}:/input,${OUTPUT_DIR}:/output"
 
 # Verify bind paths
 for path in "${SCRATCH_DIR}/OCD" "${PROJECT_DIR}/metadata" "${CLINICAL_CSV}" "${SUBJECTS_CSV}" "${INPUT_DIR}" "${OUTPUT_DIR}"; do
@@ -81,5 +81,5 @@ apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_group.py 
     --clinical_csv /clinical.csv \
     --output_dir /output \
     --input_dir /input \
-    --atlas_name ${ATLAS}
+    --atlas_name "${ATLAS}"
 
