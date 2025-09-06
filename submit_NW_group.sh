@@ -19,7 +19,8 @@
 #      bash submit_NW_group.sh --atlas power_2011
 #
 #   3. Run with Schaefer 2018 atlas (400 ROIs, 7 networks):
-#      bash submit_NW_group.sh --atlas schaefer_2018 --atlas-params '{"n_rois": 400, "yeo_networks": 7}'
+#      
+
 #
 #   4. Run with Harvard-Oxford atlas (anatomical):
 #      bash submit_NW_group.sh --atlas harvard_oxford --atlas-params '{"atlas_name": "cort-maxprob-thr25-2mm"}'
@@ -142,8 +143,8 @@ echo "Creating SLURM job script: $JOB_SCRIPT"
 echo "Job name: $JOB_NAME"
 echo "Atlas: $ATLAS_NAME"
 
-# Create the SLURM job script
-cat > "$JOB_SCRIPT" << EOF
+# Create the SLURM job script using a template approach
+cat > "$JOB_SCRIPT" << 'TEMPLATE_EOF'
 #!/bin/bash
 #SBATCH --job-name=${JOB_NAME}
 #SBATCH --output=/scratch/xxqian/logs/NWGroup_${ATLAS_NAME}_%j.out
@@ -200,8 +201,8 @@ apptainer exec \$CONTAINER python NW_group.py \\
   $AUTO_DETECT_ATLAS \\
   $NO_FDR \\
   $VERBOSE \\
-  \$([ -n "\$ATLAS" ] && echo "--atlas_name \$ATLAS") \\
-  \$([ -n "\$ATLAS_PARAMS" ] && echo "--atlas_params '\$ATLAS_PARAMS'")
+  \$([ -n \"\${ATLAS}\" ] && echo \"--atlas_name \${ATLAS}\") \\
+  \$([ -n \"\${ATLAS_PARAMS}\" ] && echo \"--atlas_params \${ATLAS_PARAMS}\")
 
 # Check exit status
 EXIT_STATUS=\$?
@@ -221,7 +222,22 @@ fi
 
 echo "=========================================="
 exit \$EXIT_STATUS
-EOF
+TEMPLATE_EOF
+
+# Replace template variables
+sed -i "s/\${JOB_NAME}/$JOB_NAME/g" "$JOB_SCRIPT"
+sed -i "s/\${ATLAS_NAME}/$ATLAS_NAME/g" "$JOB_SCRIPT"
+sed -i "s/\${SUBJECTS_CSV}/$SUBJECTS_CSV/g" "$JOB_SCRIPT"
+sed -i "s/\${CLINICAL_CSV}/$CLINICAL_CSV/g" "$JOB_SCRIPT"
+sed -i "s/\${INPUT_DIR}/$INPUT_DIR/g" "$JOB_SCRIPT"
+sed -i "s/\${OUTPUT_DIR}/$OUTPUT_DIR/g" "$JOB_SCRIPT"
+sed -i "s/\${MIN_SUBJECTS}/$MIN_SUBJECTS/g" "$JOB_SCRIPT"
+sed -i "s/\${SIGNIFICANCE_THRESHOLD}/$SIGNIFICANCE_THRESHOLD/g" "$JOB_SCRIPT"
+sed -i "s/\${AUTO_DETECT_ATLAS}/$AUTO_DETECT_ATLAS/g" "$JOB_SCRIPT"
+sed -i "s/\${NO_FDR}/$NO_FDR/g" "$JOB_SCRIPT"
+sed -i "s/\${VERBOSE}/$VERBOSE/g" "$JOB_SCRIPT"
+sed -i "s/\${ATLAS}/$ATLAS/g" "$JOB_SCRIPT"
+sed -i "s/\${ATLAS_PARAMS}/$ATLAS_PARAMS/g" "$JOB_SCRIPT"
 
 # Submit the job
 echo "Submitting job: $JOB_NAME"
