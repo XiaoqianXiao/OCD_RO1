@@ -81,6 +81,5 @@ apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_group.py 
     --clinical_csv /clinical.csv \
     --output_dir /output \
     --input_dir /input \
-    --atlas_name ${ATLAS} \
-    --atlas_params '${ATLAS_PARAMS}'
+    --atlas_name ${ATLAS}
 
