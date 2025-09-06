@@ -52,7 +52,7 @@ export OMP_NUM_THREADS=8
 # Define directories and files
 PROJECT_DIR="/project/6079231/dliang55/R01_AOCD"
 SCRATCH_DIR="/scratch/xxqian"
-OUTPUT_DIR="${SCRATCH_DIR}/OCD/NW_group"
+OUTPUT_DIR="${SCRATCH_DIR}/OCD/NW_group_roi_network"
 SUBJECTS_CSV="${PROJECT_DIR}/metadata/shared_demographics.csv"
 CLINICAL_CSV="${SCRATCH_DIR}/OCD/behav/clinical.csv"
 INPUT_DIR="${SCRATCH_DIR}/OCD/NW_1st"
