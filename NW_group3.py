@@ -32,7 +32,7 @@ USAGE EXAMPLES:
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name power_2011
-
+kl
 2. Schaefer 2018 Atlas (Network-based, 400 ROIs, 7 networks):
    python NW_group3.py \\
      --subjects_csv group.csv \\
