@@ -55,7 +55,7 @@ SCRATCH_DIR="/scratch/xxqian"
 OUTPUT_DIR="${SCRATCH_DIR}/OCD/NW_group"
 SUBJECTS_CSV="${PROJECT_DIR}/metadata/shared_demographics.csv"
 CLINICAL_CSV="${SCRATCH_DIR}/OCD/behav/clinical.csv"
-INPUT_DIR="${SCRATCH_DIR}/OCD/NW_1stLevel"
+INPUT_DIR="${SCRATCH_DIR}/OCD/NW_1st"
 
 
 
