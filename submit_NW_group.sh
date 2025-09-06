@@ -191,18 +191,7 @@ echo "  \$([ -n \"\${ATLAS_PARAMS}\" ] && echo \"--atlas_params \${ATLAS_PARAMS}
 echo "=========================================="
 
 # Execute the analysis
-apptainer exec $CONTAINER python NW_group.py \\
-  --subjects_csv "\${SUBJECTS_CSV}" \\
-  --clinical_csv "\${CLINICAL_CSV}" \\
-  --input_dir "\${INPUT_DIR}" \\
-  --output_dir "\${OUTPUT_DIR}" \\
-  --min_subjects \${MIN_SUBJECTS} \\
-  --significance_threshold \${SIGNIFICANCE_THRESHOLD} \\
-  \${AUTO_DETECT_ATLAS} \\
-  \${NO_FDR} \\
-  \${VERBOSE} \\
-  \$([ -n \"\${ATLAS}\" ] && echo \"--atlas_name \${ATLAS}\") \\
-  \$([ -n \"\${ATLAS_PARAMS}\" ] && echo \"--atlas_params \${ATLAS_PARAMS}\")
+apptainer exec $CONTAINER python NW_group.py --subjects_csv "\${SUBJECTS_CSV}" --clinical_csv "\${CLINICAL_CSV}" --input_dir "\${INPUT_DIR}" --output_dir "\${OUTPUT_DIR}" --min_subjects \${MIN_SUBJECTS} --significance_threshold \${SIGNIFICANCE_THRESHOLD} \${AUTO_DETECT_ATLAS} \${NO_FDR} \${VERBOSE} \$([ -n \"\${ATLAS}\" ] && echo \"--atlas_name \${ATLAS}\") \$([ -n \"\${ATLAS_PARAMS}\" ] && echo \"--atlas_params \${ATLAS_PARAMS}\")
 
 # Check exit status
 EXIT_STATUS=$?
