@@ -134,16 +134,16 @@ module load apptainer
 
 apptainer exec --bind /project/6079231:/project/6079231,/scratch/xxqian:/scratch/xxqian "${CONTAINER}" \\
     python3 /app/NW_group.py \\
-    --atlas ${ATLAS} \\
-    --subjects-csv ${SUBJECTS_CSV} \\
-    --clinical-csv ${CLINICAL_CSV} \\
-    --input-dir ${INPUT_DIR} \\
-    --output-dir ${OUTPUT_DIR} \\
-    --min-subjects ${MIN_SUBJECTS} \\
-    --significance-threshold ${SIGNIFICANCE_THRESHOLD} \\
-    $([ "$NO_FDR" = true ] && echo "--no-fdr") \\
+    --atlas_name ${ATLAS} \\
+    --subjects_csv ${SUBJECTS_CSV} \\
+    --clinical_csv ${CLINICAL_CSV} \\
+    --input_dir ${INPUT_DIR} \\
+    --output_dir ${OUTPUT_DIR} \\
+    --min_subjects ${MIN_SUBJECTS} \\
+    --significance_threshold ${SIGNIFICANCE_THRESHOLD} \\
+    $([ "$NO_FDR" = true ] && echo "--no_fdr") \\
     $([ "$VERBOSE" = true ] && echo "--verbose") \\
-    $([ -n "$ATLAS_PARAMS" ] && echo "--atlas-params '${ATLAS_PARAMS}'")
+    $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params '${ATLAS_PARAMS}'")
 EOF
 
 # Submit job

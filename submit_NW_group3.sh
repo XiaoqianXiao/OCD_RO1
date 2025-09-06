@@ -173,6 +173,19 @@ CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
 # Set environment variables
 export OMP_NUM_THREADS=8
 
+# Export runtime variables
+export SUBJECTS_CSV="__SUBJECTS_CSV__"
+export CLINICAL_CSV="__CLINICAL_CSV__"
+export INPUT_DIR="__INPUT_DIR__"
+export OUTPUT_DIR="__OUTPUT_DIR__"
+export MIN_SUBJECTS=__MIN_SUBJECTS__
+export SIGNIFICANCE_THRESHOLD=__SIGNIFICANCE_THRESHOLD__
+export AUTO_DETECT_ATLAS="__AUTO_DETECT_ATLAS__"
+export NO_FDR="__NO_FDR__"
+export VERBOSE="__VERBOSE__"
+export ATLAS="__ATLAS__"
+export ATLAS_PARAMS='__ATLAS_PARAMS__'
+
 # Print job information
 echo "=========================================="
 echo "ROI-to-ROI FC Group Analysis Job"
@@ -180,27 +193,32 @@ echo "=========================================="
 echo "Job ID: \$SLURM_JOB_ID"
 echo "Node: \$SLURM_NODELIST"
 echo "Start time: \$(date)"
-echo "Atlas: $ATLAS_NAME"
+echo "Atlas: \$ATLAS"
 echo "=========================================="
 
 # Run the analysis
 echo "Starting ROI-to-ROI FC group analysis..."
-echo "Command: apptainer exec \$CONTAINER python NW_group3.py \\"
-echo "  --subjects_csv $SUBJECTS_CSV \\"
-echo "  --clinical_csv $CLINICAL_CSV \\"
-echo "  --input_dir $INPUT_DIR \\"
-echo "  --output_dir $OUTPUT_DIR \\"
-echo "  --min_subjects $MIN_SUBJECTS \\"
-echo "  --significance_threshold $SIGNIFICANCE_THRESHOLD \\"
-echo "  $AUTO_DETECT_ATLAS \\"
-echo "  $NO_FDR \\"
-echo "  $VERBOSE \\"
-echo "  $([ -n "$ATLAS" ] && echo "--atlas_name $ATLAS") \\"
-echo "  $([ -n "$ATLAS_PARAMS" ] && echo "--atlas_params '$ATLAS_PARAMS'")"
-echo "=========================================="
+CMD="apptainer exec \$CONTAINER python NW_group3.py \
+  --subjects_csv \$SUBJECTS_CSV \
+  --clinical_csv \$CLINICAL_CSV \
+  --input_dir \$INPUT_DIR \
+  --output_dir \$OUTPUT_DIR \
+  --min_subjects \$MIN_SUBJECTS \
+  --significance_threshold \$SIGNIFICANCE_THRESHOLD \
+  \$AUTO_DETECT_ATLAS \
+  \$NO_FDR \
+  \$VERBOSE"
 
-# Execute the analysis
-apptainer exec $CONTAINER python NW_group3.py --subjects_csv "\${SUBJECTS_CSV}" --clinical_csv "\${CLINICAL_CSV}" --input_dir "\${INPUT_DIR}" --output_dir "\${OUTPUT_DIR}" --min_subjects \${MIN_SUBJECTS} --significance_threshold \${SIGNIFICANCE_THRESHOLD} \${AUTO_DETECT_ATLAS} \${NO_FDR} \${VERBOSE} \$([ -n \"\${ATLAS}\" ] && echo \"--atlas_name \${ATLAS}\") \$([ -n \"\${ATLAS_PARAMS}\" ] && echo \"--atlas_params \${ATLAS_PARAMS}\")
+if [ -n "\$ATLAS" ]; then
+  CMD+=" --atlas_name \$ATLAS"
+fi
+
+if [ -n "\$ATLAS_PARAMS" ]; then
+  CMD+=" --atlas_params '\$ATLAS_PARAMS'"
+fi
+
+echo "Command: \$CMD"
+eval \$CMD
 
 # Check exit status
 EXIT_STATUS=\$?
@@ -225,6 +243,17 @@ TEMPLATE_EOF
 # Replace placeholders
 sed -i "s|__JOB_NAME__|$JOB_NAME|g" "$JOB_SCRIPT"
 sed -i "s|__ATLAS_NAME__|$ATLAS_NAME|g" "$JOB_SCRIPT"
+sed -i "s|__SUBJECTS_CSV__|$SUBJECTS_CSV|g" "$JOB_SCRIPT"
+sed -i "s|__CLINICAL_CSV__|$CLINICAL_CSV|g" "$JOB_SCRIPT"
+sed -i "s|__INPUT_DIR__|$INPUT_DIR|g" "$JOB_SCRIPT"
+sed -i "s|__OUTPUT_DIR__|$OUTPUT_DIR|g" "$JOB_SCRIPT"
+sed -i "s|__MIN_SUBJECTS__|$MIN_SUBJECTS|g" "$JOB_SCRIPT"
+sed -i "s|__SIGNIFICANCE_THRESHOLD__|$SIGNIFICANCE_THRESHOLD|g" "$JOB_SCRIPT"
+sed -i "s|__AUTO_DETECT_ATLAS__|$AUTO_DETECT_ATLAS|g" "$JOB_SCRIPT"
+sed -i "s|__NO_FDR__|$NO_FDR|g" "$JOB_SCRIPT"
+sed -i "s|__VERBOSE__|$VERBOSE|g" "$JOB_SCRIPT"
+sed -i "s|__ATLAS__|$ATLAS|g" "$JOB_SCRIPT"
+sed -i "s|__ATLAS_PARAMS__|$ATLAS_PARAMS|g" "$JOB_SCRIPT"
 
 # Submit the job
 echo "Submitting job: $JOB_NAME"
