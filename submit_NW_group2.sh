@@ -190,18 +190,11 @@ CMD="apptainer exec \$CONTAINER python NW_group2.py \
   --clinical_csv \$CLINICAL_CSV \
   --input_dir \$INPUT_DIR \
   --output_dir \$OUTPUT_DIR \
-  --min_subjects \$MIN_SUBJECTS \
-  --significance_threshold \$SIGNIFICANCE_THRESHOLD \
   \$AUTO_DETECT_ATLAS \
-  \$NO_FDR \
   \$VERBOSE"
 
 if [ -n "\$ATLAS" ]; then
   CMD+=" --atlas_name \$ATLAS"
-fi
-
-if [ -n "\$ATLAS_PARAMS" ]; then
-  CMD+=" --atlas_params '\$ATLAS_PARAMS'"
 fi
 
 echo "Command: \$CMD"
