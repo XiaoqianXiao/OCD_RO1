@@ -558,6 +558,7 @@ def perform_group_comparison(fc_data: Dict[str, Dict[str, pd.DataFrame]],
     
     if len(hc_data) < DEFAULT_CONFIG['min_subjects_per_group'] or len(ocd_data) < DEFAULT_CONFIG['min_subjects_per_group']:
         logger.warning("Insufficient subjects per group (min: %d)", DEFAULT_CONFIG['min_subjects_per_group'])
+        logger.info("Returning empty results due to insufficient subjects")
         return pd.DataFrame()
     
     # Perform t-tests for each ROI pair
@@ -575,6 +576,10 @@ def perform_group_comparison(fc_data: Dict[str, Dict[str, pd.DataFrame]],
     for _, row in roi_pairs.iterrows():
         roi1, roi2 = row['ROI1'], row['ROI2']
         
+        # Extract network information if available
+        network1 = row.get('network1', 'Unknown') if 'network1' in row else 'Unknown'
+        network2 = row.get('network2', 'Unknown') if 'network2' in row else 'Unknown'
+        
         # Extract FC values for this ROI pair
         hc_values = []
         ocd_values = []
@@ -583,11 +588,21 @@ def perform_group_comparison(fc_data: Dict[str, Dict[str, pd.DataFrame]],
             pair_data = fc_df[(fc_df['ROI1'] == roi1) & (fc_df['ROI2'] == roi2)]
             if not pair_data.empty:
                 hc_values.append(pair_data['fc_value'].iloc[0])
+                # Get network info from first available data
+                if network1 == 'Unknown' and 'network1' in pair_data.columns:
+                    network1 = pair_data['network1'].iloc[0]
+                if network2 == 'Unknown' and 'network2' in pair_data.columns:
+                    network2 = pair_data['network2'].iloc[0]
         
         for fc_df in ocd_data:
             pair_data = fc_df[(fc_df['ROI1'] == roi1) & (fc_df['ROI2'] == roi2)]
             if not pair_data.empty:
                 ocd_values.append(pair_data['fc_value'].iloc[0])
+                # Get network info from first available data
+                if network1 == 'Unknown' and 'network1' in pair_data.columns:
+                    network1 = pair_data['network1'].iloc[0]
+                if network2 == 'Unknown' and 'network2' in pair_data.columns:
+                    network2 = pair_data['network2'].iloc[0]
         
         if len(hc_values) > 0 and len(ocd_values) > 0:
             # Perform t-test
@@ -602,6 +617,8 @@ def perform_group_comparison(fc_data: Dict[str, Dict[str, pd.DataFrame]],
             results.append({
                 'ROI1': roi1,
                 'ROI2': roi2,
+                'network1': network1,
+                'network2': network2,
                 'HC_mean': np.mean(hc_values),
                 'OCD_mean': np.mean(ocd_values),
                 'HC_std': np.std(hc_values, ddof=1),
@@ -646,6 +663,7 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
     
     if len(subjects_with_both_sessions) < DEFAULT_CONFIG['min_subjects_per_group']:
         logger.warning("Insufficient subjects for longitudinal analysis")
+        logger.info("Returning empty results due to insufficient subjects")
         return pd.DataFrame(), pd.DataFrame()
     
     # Get all ROI pairs from the first subject
@@ -657,6 +675,10 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
     
     for _, row in roi_pairs.iterrows():
         roi1, roi2 = row['ROI1'], row['ROI2']
+        
+        # Extract network information if available
+        network1 = row.get('network1', 'Unknown') if 'network1' in row else 'Unknown'
+        network2 = row.get('network2', 'Unknown') if 'network2' in row else 'Unknown'
         
         baseline_fc_values = []
         delta_ybocs_values = []
@@ -676,6 +698,11 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
                     baseline_fc = baseline_pair['fc_value'].iloc[0]
                     baseline_fc_values.append(baseline_fc)
                     delta_ybocs_values.append(delta_ybocs)
+                    # Get network info from first available data
+                    if network1 == 'Unknown' and 'network1' in baseline_pair.columns:
+                        network1 = baseline_pair['network1'].iloc[0]
+                    if network2 == 'Unknown' and 'network2' in baseline_pair.columns:
+                        network2 = baseline_pair['network2'].iloc[0]
                 
                 # Get FC change
                 followup_fc_df = fc_data[subject]['followup']
@@ -693,6 +720,8 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
             baseline_fc_results.append({
                 'ROI1': roi1,
                 'ROI2': roi2,
+                'network1': network1,
+                'network2': network2,
                 'correlation': r,
                 'p_value': p,
                 'n_subjects': len(baseline_fc_values)
@@ -704,6 +733,8 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
             delta_fc_results.append({
                 'ROI1': roi1,
                 'ROI2': roi2,
+                'network1': network1,
+                'network2': network2,
                 'correlation': r,
                 'p_value': p,
                 'n_subjects': len(delta_fc_values)
@@ -798,28 +829,40 @@ def run_analysis(args: argparse.Namespace, logger: logging.Logger) -> None:
     atlas_logger.info("Performing longitudinal analysis...")
     baseline_fc_long, delta_fc_long = perform_longitudinal_analysis(fc_data, clinical_df, atlas_name, atlas_logger)
     
-    # Save results
+    # Save results (always save, regardless of significance)
     atlas_logger.info("Saving results...")
     
+    # Save baseline group comparison results
     if not baseline_results.empty:
         baseline_file = os.path.join(args.output_dir, f'group_diff_baseline_{atlas_name}_roiroi_fc.csv')
         baseline_results.to_csv(baseline_file, index=False)
         atlas_logger.info("Saved baseline group comparison: %s", baseline_file)
+    else:
+        atlas_logger.info("No baseline group comparison results to save")
     
+    # Save follow-up group comparison results
     if not followup_results.empty:
         followup_file = os.path.join(args.output_dir, f'group_diff_followup_{atlas_name}_roiroi_fc.csv')
         followup_results.to_csv(followup_file, index=False)
         atlas_logger.info("Saved follow-up group comparison: %s", followup_file)
+    else:
+        atlas_logger.info("No follow-up group comparison results to save")
     
+    # Save baseline FC vs delta YBOCS results
     if not baseline_fc_long.empty:
         baseline_long_file = os.path.join(args.output_dir, f'baselineFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
         baseline_fc_long.to_csv(baseline_long_file, index=False)
         atlas_logger.info("Saved baseline FC vs delta YBOCS: %s", baseline_long_file)
+    else:
+        atlas_logger.info("No baseline FC vs delta YBOCS results to save")
     
+    # Save delta FC vs delta YBOCS results
     if not delta_fc_long.empty:
         delta_long_file = os.path.join(args.output_dir, f'deltaFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
         delta_fc_long.to_csv(delta_long_file, index=False)
         atlas_logger.info("Saved delta FC vs delta YBOCS: %s", delta_long_file)
+    else:
+        atlas_logger.info("No delta FC vs delta YBOCS results to save")
     
     # Create summary
     summary_data = {
