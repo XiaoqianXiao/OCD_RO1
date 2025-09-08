@@ -15,55 +15,55 @@ USAGE EXAMPLES:
 ==============
 
 1. Power 2011 Atlas (Default):
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data
 
 2. Schaefer 2018 Atlas (400 ROIs, 7 networks):
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name schaefer_2018_400_7_2
 
 3. Schaefer 2018 Atlas (1000 ROIs, 17 networks):
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name schaefer_2018_1000_17_1
 
 4. With Specific Atlas Name:
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name power_2011
 
 5. YEO 2011 Atlas (7 networks):
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name yeo_2011_7_thick
 
 6. YEO 2011 Atlas (17 networks):
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name yeo_2011_17_thick
 
 7. Harvard-Oxford Atlas:
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name harvard_oxford_cort-maxprob-thr25-2mm
 
 8. Auto-detect Atlas from Input Files:
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
@@ -73,22 +73,22 @@ ATLAS NAMING CONVENTIONS:
 ========================
 
 The script automatically detects atlas names from input FC files:
-- Power 2011: power_2011_network_fc_avg.csv
-- Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}_network_fc_avg.csv
+- Power 2011: power_2011_roiroi_fc_avg.csv
+- Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}_roiroi_fc_avg.csv
   Examples:
-    - schaefer_2018_400_7_2_network_fc_avg.csv (400 ROIs, 7 networks, 2mm)
-    - schaefer_2018_1000_17_1_network_fc_avg.csv (1000 ROIs, 17 networks, 1mm)
-- YEO 2011: yeo_2011_{n_networks}_{thickness}_network_fc_avg.csv
+    - schaefer_2018_400_7_2_roiroi_fc_avg.csv (400 ROIs, 7 networks, 2mm)
+    - schaefer_2018_1000_17_1_roiroi_fc_avg.csv (1000 ROIs, 17 networks, 1mm)
+- YEO 2011: yeo_2011_{n_networks}_{thickness}_roiroi_fc_avg.csv
   Examples:
-    - yeo_2011_7_thick_network_fc_avg.csv (7 networks, thick parcellation)
-    - yeo_2011_17_thin_network_fc_avg.csv (17 networks, thin parcellation)
+    - yeo_2011_7_thick_roiroi_fc_avg.csv (7 networks, thick parcellation)
+    - yeo_2011_17_thin_roiroi_fc_avg.csv (17 networks, thin parcellation)
 - Harvard-Oxford: harvard_oxford_{atlas_name}_roiroi_fc_avg.csv
   Examples:
     - harvard_oxford_cort-maxprob-thr25-2mm_roiroi_fc_avg.csv
     - harvard_oxford_sub-maxprob-thr25-2mm_roiroi_fc_avg.csv
 - AAL: aal_roiroi_fc_avg.csv
 - Talairach: talairach_roiroi_fc_avg.csv
-- Custom: custom_atlas_network_fc_avg.csv (if network-based) or custom_atlas_roiroi_fc_avg.csv (if anatomical)
+- Custom: custom_atlas_roiroi_fc_avg.csv (if network-based) or custom_atlas_roiroi_fc_avg.csv (if anatomical)
 
 Note: For Schaefer 2018, the naming follows the pattern: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}
 where n_rois can be 100, 200, 300, 400, 500, 600, 700, 800, 900, or 1000,
@@ -96,8 +96,8 @@ yeo_networks can be 7 or 17, and resolution_mm can be 1 or 2.
 For YEO 2011, the naming follows: yeo_2011_{n_networks}_{thickness}
 where n_networks can be 7 or 17, and thickness can be 'thick' or 'thin'.
 
-IMPORTANT: This script (NW_group.py) can handle BOTH file types:
-- Network-based atlases (Power 2011, Schaefer 2018, YEO 2011) generate *_network_fc_avg.csv files
+IMPORTANT: This script (NW_group3.py) can handle BOTH file types:
+- All atlases (Power 2011, Schaefer 2018, YEO 2011) generate *_roiroi_fc_avg.csv files
 - Anatomical atlases (Harvard-Oxford, AAL, Talairach) generate *_roiroi_fc_avg.csv files
 Both file types are automatically detected and processed appropriately.
 
@@ -204,55 +204,55 @@ def parse_arguments() -> argparse.Namespace:
         epilog="""
 Examples:
   # Power 2011 Atlas (Default)
-  python NW_group.py \\
+  python NW_group3.py \\
     --subjects_csv group.csv \\
     --clinical_csv clinical.csv \\
     --input_dir /path/to/fc/data
 
   # Schaefer 2018 Atlas (400 ROIs, 7 networks)
-  python NW_group.py \\
+  python NW_group3.py \\
     --subjects_csv group.csv \\
     --clinical_csv clinical.csv \\
     --input_dir /path/to/fc/data \\
     --atlas_name schaefer_2018_400_7_2
 
   # Schaefer 2018 Atlas (1000 ROIs, 17 networks)
-  python NW_group.py \\
+  python NW_group3.py \\
     --subjects_csv group.csv \\
     --clinical_csv clinical.csv \\
     --input_dir /path/to/fc/data \\
     --atlas_name schaefer_2018_1000_17_1
 
   # With Specific Atlas Name
-  python NW_group.py \\
+  python NW_group3.py \\
     --subjects_csv group.csv \\
     --clinical_csv clinical.csv \\
     --input_dir /path/to/fc/data \\
     --atlas_name power_2011
 
   # YEO 2011 Atlas (7 networks)
-  python NW_group.py \\
+  python NW_group3.py \\
     --subjects_csv group.csv \\
     --clinical_csv clinical.csv \\
     --input_dir /path/to/fc/data \\
     --atlas_name yeo_2011_7_thick
 
   # YEO 2011 Atlas (17 networks)
-  python NW_group.py \\
+  python NW_group3.py \\
     --subjects_csv group.csv \\
     --clinical_csv clinical.csv \\
     --input_dir /path/to/fc/data \\
     --atlas_name yeo_2011_17_thick
 
   # Harvard-Oxford Atlas
-  python NW_group.py \\
+  python NW_group3.py \\
     --subjects_csv group.csv \\
     --clinical_csv clinical.csv \\
     --input_dir /path/to/fc/data \\
     --atlas_name harvard_oxford_cort-maxprob-thr25-2mm
 
   # Auto-detect Atlas from Input Files
-  python NW_group.py \\
+  python NW_group3.py \\
     --subjects_csv group.csv \\
     --clinical_csv clinical.csv \\
     --input_dir /path/to/fc/data \\
@@ -855,7 +855,7 @@ def validate_subjects(
 
 def validate_roiroi_fc_file(fc_path: str, logger: logging.Logger) -> bool:
     """Validate that ROI-to-ROI FC file has required columns."""
-    required_columns = {'ROI', 'fc_value'}
+    required_columns = {'ROI', 'FC'}
     
     try:
         df = pd.read_csv(fc_path)
@@ -910,10 +910,9 @@ def load_roiroi_fc_data(
             fc_df = pd.read_csv(fc_path)
             logger.debug("Loaded ROI-to-ROI FC file %s with %d rows", fc_path, len(fc_df))
             
-            # Create feature identifier and map networks (same as NW_group.py)
+            # Create feature identifier and map networks (same as NW_group3.py)
             fc_df['feature_id'] = fc_df['ROI']
-            
-            if feature_info is None:
+                        if feature_info is None:
                 feature_info = {}
                 for _, row in fc_df.iterrows():
                     roi_pair = row['ROI']
@@ -924,11 +923,11 @@ def load_roiroi_fc_data(
                     len(feature_info)
                 )
             
-            # Pivot to make features as columns (same as NW_group.py)
+            # Pivot to make features as columns (same as NW_group3.py)
             fc_pivot = fc_df.pivot_table(
                 index=None,
                 columns='feature_id',
-                values='fc_value'
+                values='FC'
             ).reset_index(drop=True)
             fc_pivot['subject_id'] = sid_no_prefix
             fc_data.append(fc_pivot)
@@ -1139,7 +1138,7 @@ def analyze_followup_by_condition(
             
             # Pivot to make features as columns
             follow_pivot = follow_fc.pivot_table(
-                index=None, columns='feature_id', values='fc_value'
+                index=None, columns='feature_id', values='FC'
             ).reset_index(drop=True)
             follow_pivot['subject_id'] = sid_clean
             followup_fc_data.append(follow_pivot)
@@ -1194,10 +1193,10 @@ def analyze_fc_change_by_condition(
             
             # Pivot and compute change
             base_pivot = base_fc.pivot_table(
-                index=None, columns='feature_id', values='fc_value'
+                index=None, columns='feature_id', values='FC'
             ).reset_index(drop=True)
             follow_pivot = follow_fc.pivot_table(
-                index=None, columns='feature_id', values='fc_value'
+                index=None, columns='feature_id', values='FC'
             ).reset_index(drop=True)
             
             change_pivot = follow_pivot - base_pivot
@@ -1358,10 +1357,10 @@ def perform_longitudinal_analysis(
             
             # Pivot and compute change
             base_pivot = base_fc.pivot_table(
-                index=None, columns='feature_id', values='fc_value'
+                index=None, columns='feature_id', values='FC'
             ).reset_index(drop=True)
             follow_pivot = follow_fc.pivot_table(
-                index=None, columns='feature_id', values='fc_value'
+                index=None, columns='feature_id', values='FC'
             ).reset_index(drop=True)
             
             change_pivot = follow_pivot - base_pivot
@@ -1526,35 +1525,35 @@ def main():
 def print_quick_help():
     """Print quick help information."""
     quick_help = """
-QUICK HELP - ROI-to-Network Functional Connectivity Group Analysis
+QUICK HELP - ROI-to-ROI Functional Connectivity Group Analysis
 =================================================================
 
 BASIC USAGE:
-  python NW_group.py --subjects_csv <GROUP_CSV> --clinical_csv <CLINICAL_CSV> --input_dir <FC_DATA_DIR>
+  python NW_group3.py --subjects_csv <GROUP_CSV> --clinical_csv <CLINICAL_CSV> --input_dir <FC_DATA_DIR>
 
 QUICK EXAMPLES:
   1. Default Atlas (Power 2011):
-     python NW_group.py \\
+     python NW_group3.py \\
        --subjects_csv group.csv \\
        --clinical_csv clinical.csv \\
        --input_dir /path/to/fc/data
 
   2. Specific Atlas:
-     python NW_group.py \\
+     python NW_group3.py \\
        --subjects_csv group.csv \\
        --clinical_csv clinical.csv \\
        --input_dir /path/to/fc/data \\
        --atlas_name schaefer_2018_400_7_2
 
   3. YEO 2011 Atlas:
-     python NW_group.py \\
+     python NW_group3.py \\
        --subjects_csv group.csv \\
        --clinical_csv clinical.csv \\
        --input_dir /path/to/fc/data \\
        --atlas_name yeo_2011_7_thick
 
   4. Auto-detect Atlas:
-     python NW_group.py \\
+     python NW_group3.py \\
        --subjects_csv group.csv \\
        --clinical_csv clinical.csv \\
        --input_dir /path/to/fc/data \\
@@ -1578,30 +1577,30 @@ DETAILED USAGE EXAMPLES
    ---------------------------
    This is the simplest usage, using the default Power 2011 atlas.
    
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data
    
-   Expected FC files: *_task-rest_power_2011_network_fc_avg.csv
+   Expected FC files: *_task-rest_power_2011_roiroi_fc_avg.csv
 
 2. SPECIFIC ATLAS NAME
    --------------------
    Use when you know the exact atlas name from NW_1st.py output.
    
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name schaefer_2018_400_7_2
    
-   Expected FC files: *_task-rest_schaefer_2018_400_7_2_network_fc_avg.csv
+   Expected FC files: *_task-rest_schaefer_2018_400_7_2_roiroi_fc_avg.csv
 
 3. AUTO-DETECT ATLAS
    ------------------
    Automatically detect atlas name from available FC files.
    
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
@@ -1613,7 +1612,7 @@ DETAILED USAGE EXAMPLES
    -----------------------------
    Override the default output directory.
    
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
@@ -1624,7 +1623,7 @@ DETAILED USAGE EXAMPLES
    ----------------
    Enable detailed logging for debugging.
    
-   python NW_group.py \\
+   python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
@@ -1635,7 +1634,7 @@ REQUIRED FILES:
 - group.csv: Contains subject IDs and group labels (HC/OCD)
 - clinical.csv: Contains clinical data including YBOCS scores
 - FC data files: Generated by NW_1st.py with naming patterns:
-  *_{session}_task-rest_{atlas_name}_network_fc_avg.csv (for network-based atlases)
+  *_{session}_task-rest_{atlas_name}_roiroi_fc_avg.csv (for network-based atlases)
   *_{session}_task-rest_{atlas_name}_roiroi_fc_avg.csv (for anatomical atlases)
 
 OUTPUT FILES:
@@ -1647,22 +1646,22 @@ OUTPUT FILES:
 ATLAS NAMING CONVENTIONS:
 -------------------------
 The script automatically detects atlas names from input FC files:
-- Power 2011: power_2011_network_fc_avg.csv
-- Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}_network_fc_avg.csv
+- Power 2011: power_2011_roiroi_fc_avg.csv
+- Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}_roiroi_fc_avg.csv
   Examples:
-    - schaefer_2018_400_7_2_network_fc_avg.csv (400 ROIs, 7 networks, 2mm)
-    - schaefer_2018_1000_17_1_network_fc_avg.csv (1000 ROIs, 17 networks, 1mm)
-- YEO 2011: yeo_2011_{n_networks}_{thickness}_network_fc_avg.csv
+    - schaefer_2018_400_7_2_roiroi_fc_avg.csv (400 ROIs, 7 networks, 2mm)
+    - schaefer_2018_1000_17_1_roiroi_fc_avg.csv (1000 ROIs, 17 networks, 1mm)
+- YEO 2011: yeo_2011_{n_networks}_{thickness}_roiroi_fc_avg.csv
   Examples:
-    - yeo_2011_7_thick_network_fc_avg.csv (7 networks, thick parcellation)
-    - yeo_2011_17_thin_network_fc_avg.csv (17 networks, thin parcellation)
+    - yeo_2011_7_thick_roiroi_fc_avg.csv (7 networks, thick parcellation)
+    - yeo_2011_17_thin_roiroi_fc_avg.csv (17 networks, thin parcellation)
 - Harvard-Oxford: harvard_oxford_{atlas_name}_roiroi_fc_avg.csv
   Examples:
     - harvard_oxford_cort-maxprob-thr25-2mm_roiroi_fc_avg.csv
     - harvard_oxford_sub-maxprob-thr25-2mm_roiroi_fc_avg.csv
 - AAL: aal_roiroi_fc_avg.csv
 - Talairach: talairach_roiroi_fc_avg.csv
-- Custom: custom_atlas_network_fc_avg.csv (if network-based) or custom_atlas_roiroi_fc_avg.csv (if anatomical)
+- Custom: custom_atlas_roiroi_fc_avg.csv (if network-based) or custom_atlas_roiroi_fc_avg.csv (if anatomical)
 
 Note: For Schaefer 2018, the naming follows the pattern: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}
 where n_rois can be 100, 200, 300, 400, 500, 600, 700, 800, 900, or 1000,
@@ -1670,15 +1669,15 @@ yeo_networks can be 7 or 17, and resolution_mm can be 1 or 2.
 For YEO 2011, the naming follows: yeo_2011_{n_networks}_{thickness}
 where n_networks can be 7 or 17, and thickness can be 'thick' or 'thin'.
 
-IMPORTANT: This script (NW_group.py) can handle BOTH file types:
-- Network-based atlases (Power 2011, Schaefer 2018, YEO 2011) generate *_network_fc_avg.csv files
+IMPORTANT: This script (NW_group3.py) can handle BOTH file types:
+- All atlases (Power 2011, Schaefer 2018, YEO 2011) generate *_roiroi_fc_avg.csv files
 - Anatomical atlases (Harvard-Oxford, AAL, Talairach) generate *_roiroi_fc_avg.csv files
 Both file types are automatically detected and processed appropriately.
 
 TROUBLESHOOTING:
 ----------------
 1. Check that FC data files exist in the input directory
-2. Verify atlas naming matches between NW_1st.py and NW_group.py
+2. Verify atlas naming matches between NW_1st.py and NW_group3.py
 3. Ensure group.csv and clinical.csv have correct subject IDs
 4. Use --verbose for detailed logging
 5. Use --auto-detect-atlas to automatically find the correct atlas name
@@ -1698,6 +1697,6 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error("Main execution failed: %s", e)
         print(f"\nError: {e}")
-        print("\nFor help, run: python NW_group.py --help")
-        print("For usage examples, run: python NW_group.py --usage")
+        print("\nFor help, run: python NW_group3.py --help")
+        print("For usage examples, run: python NW_group3.py --usage")
         raise
