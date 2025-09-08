@@ -31,11 +31,11 @@ ATLAS_PARAMS=${2:-'{}'}  # Default to empty JSON if not provided
 #SBATCH --job-name=roi_roi_fc_group_${ATLAS}
 #SBATCH --output=/scratch/xxqian/logs/ROIROIGroup_${ATLAS}_%A.out
 #SBATCH --error=/scratch/xxqian/logs/ROIROIGroup_${ATLAS}_%A.err
-#SBATCH --time=01:00:00
+#SBATCH --time=04:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=8G
+#SBATCH --mem=32G
 #SBATCH --account=def-jfeusner
 
 # Load Apptainer module
