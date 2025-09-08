@@ -318,7 +318,7 @@ def get_group(subject_id: str, metadata_df: pd.DataFrame) -> Optional[str]:
 # DATA LOADING FUNCTIONS
 # =============================================================================
 
-def load_metadata(subjects_csv: str, clinical_csv: str, logger: logging.Logger
+def load_and_validate_metadata(subjects_csv: str, clinical_csv: str, logger: logging.Logger
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Load and validate metadata CSVs including condition information."""
     logger.info("Loading metadata from %s and %s", subjects_csv, clinical_csv)
@@ -356,7 +356,7 @@ def load_metadata(subjects_csv: str, clinical_csv: str, logger: logging.Logger
 
     return df, df_clinical
 
-def detect_atlas_from_files(input_dir: str, logger: logging.Logger) -> Optional[str]:
+def detect_atlas_name_from_files(input_dir: str, logger: logging.Logger) -> Optional[str]:
     """Auto-detect atlas name from available FC files."""
     logger.info("Auto-detecting atlas from files in %s", input_dir)
     
@@ -389,7 +389,7 @@ def detect_atlas_from_files(input_dir: str, logger: logging.Logger) -> Optional[
         logger.error("Could not detect atlas from files")
         return None
 
-def validate_atlas_files(input_dir: str, atlas_name: str, logger: logging.Logger) -> bool:
+def validate_atlas_name(input_dir: str, atlas_name: str, logger: logging.Logger) -> bool:
     """Validate that FC files exist for the specified atlas."""
     pattern = os.path.join(input_dir, f'*_task-rest_{atlas_name}_roiroi_fc_avg.csv')
     files = glob.glob(pattern)
@@ -401,105 +401,198 @@ def validate_atlas_files(input_dir: str, atlas_name: str, logger: logging.Logger
     logger.info("Found %d FC files for atlas '%s'", len(files), atlas_name)
     return True
 
-def load_roiroi_fc_data(input_dir: str, atlas_name: str, logger: logging.Logger) -> Dict[str, Dict[str, pd.DataFrame]]:
-    """Load ROI-to-ROI FC data for all subjects and sessions."""
-    logger.info("Loading FC data...")
+def validate_roiroi_fc_file(fc_path: str, logger: logging.Logger) -> bool:
+    """Validate that ROI-to-ROI FC file has required columns."""
+    required_columns = {'ROI', 'network1', 'network2', 'FC'}
     
-    # Find FC files with the specific atlas
-    fc_files = glob.glob(os.path.join(input_dir, f'*_task-rest_{atlas_name}_roiroi_fc_avg.csv'))
-    logger.info("Found %d FC files for atlas %s", len(fc_files), atlas_name)
+    try:
+        df = pd.read_csv(fc_path)
+        missing_columns = required_columns - set(df.columns)
+        
+        if missing_columns:
+            logger.warning("FC file %s missing required columns: %s", fc_path, missing_columns)
+            return False
+        
+        if df.empty:
+            logger.warning("FC file %s is empty", fc_path)
+            return False
+        
+        return True
+        
+    except Exception as e:
+        logger.error("Failed to validate FC file %s: %s", fc_path, e)
+        return False
+
+def load_roiroi_fc_data(
+    subject_ids: List[str], 
+    session: str, 
+    input_dir: str, 
+    atlas_name: str,
+    logger: logging.Logger
+) -> Tuple[pd.DataFrame, Dict[str, Tuple[str, str]]]:
+    """Load ROI-to-ROI FC data for specified subjects and session."""
+    logger.info("Loading ROI-to-ROI FC data for %d subjects, session: %s", len(subject_ids), session)
     
-    if not fc_files:
-        logger.error("No FC files found for atlas %s", atlas_name)
-        return {}
-    
-    subject_sessions = {}
+    fc_data = []
     dropped_subjects = []
     
-    for f in fc_files:
-        filename = os.path.basename(f)
-        if '_ses-' not in filename or f'_task-rest_{atlas_name}_roiroi_fc_avg.csv' not in filename:
-            logger.debug("Skipping invalid FC file: %s", filename)
+    for sid in subject_ids:
+        # Ensure subject ID has sub- prefix for file naming
+        sid_with_sub = f"sub-{sid}" if not sid.startswith('sub-') else sid
+        fc_path = os.path.join(input_dir, f'{sid_with_sub}_{session}_task-rest_{atlas_name}_roiroi_fc_avg.csv')
+        
+        if not os.path.exists(fc_path):
+            logger.warning("FC file not found for subject %s: %s", sid, fc_path)
+            dropped_subjects.append((sid, "file not found"))
             continue
         
-        parts = filename.split('_')
-        if len(parts) < 2:
-            logger.debug("Skipping file with invalid format: %s", filename)
+        if not validate_roiroi_fc_file(fc_path, logger):
+            dropped_subjects.append((sid, "invalid file format"))
             continue
-        
-        subject = parts[0]  # sub-XXX
-        session = parts[1]  # ses-XXX
         
         try:
-            fc_data = pd.read_csv(f)
-            logger.debug("Loaded FC data for %s %s: %d ROI pairs", subject, session, len(fc_data))
-            
-            if subject not in subject_sessions:
-                subject_sessions[subject] = {}
-            subject_sessions[subject][session] = fc_data
+            df = pd.read_csv(fc_path)
+            df['subject_id'] = sid  # Use original subject ID without sub- prefix
+            fc_data.append(df)
+            logger.debug("Loaded FC data for %s %s: %d ROI pairs", sid, session, len(df))
             
         except Exception as e:
-            logger.warning("Failed to load FC data from %s: %s", f, str(e))
-            dropped_subjects.append(f)
+            logger.error("Failed to load FC data for subject %s: %s", sid, e)
+            dropped_subjects.append((sid, f"loading error: {e}"))
             continue
     
     if dropped_subjects:
-        logger.warning("Dropped %d subjects due to loading errors", len(dropped_subjects))
+        logger.warning("Dropped %d subjects from FC data loading: %s", len(dropped_subjects), dropped_subjects)
     
-    logger.info("Successfully loaded FC data for %d subjects", len(subject_sessions))
-    return subject_sessions
+    if not fc_data:
+        logger.error("No FC data loaded for session %s", session)
+        return pd.DataFrame(), {}
+    
+    # Combine all FC data
+    combined_fc_data = pd.concat(fc_data, ignore_index=True)
+    logger.info("Loaded ROI-to-ROI FC data for %d subjects, %d ROI pairs", len(fc_data), len(combined_fc_data))
+    
+    # Create feature info (ROI pairs with network information)
+    feature_info = {}
+    for _, row in combined_fc_data.iterrows():
+        roi_pair = row['ROI']
+        network1 = row.get('network1', 'Unknown')
+        network2 = row.get('network2', 'Unknown')
+        feature_info[roi_pair] = (network1, network2)
+    
+    logger.info("Created feature info for %d ROI pairs", len(feature_info))
+    
+    return combined_fc_data, feature_info
+
+def validate_subjects(
+    fc_dir: str, 
+    metadata_df: pd.DataFrame, 
+    atlas_name: str,
+    logger: logging.Logger
+) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
+    """Validate subjects and identify valid subjects for group and longitudinal analyses."""
+    logger.info("Validating subjects for atlas: %s", atlas_name)
+    
+    sessions = DEFAULT_CONFIG['sessions']
+    subject_sessions = {}
+    
+    # Find all available FC files
+    fc_pattern = os.path.join(fc_dir, f'*_task-rest_{atlas_name}_roiroi_fc_avg.csv')
+    fc_files = glob.glob(fc_pattern)
+    
+    if not fc_files:
+        logger.error("No FC files found for atlas %s in %s", atlas_name, fc_dir)
+        return [], [], {}
+    
+    logger.info("Found %d FC files for atlas '%s'", len(fc_files), atlas_name)
+    
+    # Parse subject sessions from filenames
+    for fc_file in fc_files:
+        filename = os.path.basename(fc_file)
+        # Pattern: sub-XXX_ses-XXX_task-rest_ATLAS_roiroi_fc_avg.csv
+        match = re.match(r'(sub-[^_]+)_(ses-[^_]+)_task-rest_.*_roiroi_fc_avg\.csv', filename)
+        if match:
+            subject = match.group(1)
+            session = match.group(2)
+            
+            if subject not in subject_sessions:
+                subject_sessions[subject] = []
+            subject_sessions[subject].append(session)
+    
+    logger.info("Found FC data for %d subjects: %s", len(subject_sessions), list(subject_sessions.keys()))
+    
+    # Subjects valid for group analysis (need baseline)
+    valid_group = []
+    dropped_group = []
+    for sid in metadata_df['subject_id']:
+        # Check both with and without sub- prefix
+        sid_with_sub = f"sub-{sid}" if not sid.startswith('sub-') else sid
+        if sid_with_sub not in subject_sessions or 'ses-baseline' not in subject_sessions.get(sid_with_sub, []):
+            logger.debug("Excluding subject %s from group analysis: no baseline FC file", sid)
+            dropped_group.append((sid, "no baseline FC file"))
+        else:
+            valid_group.append(sid)
+    
+    # Subjects valid for longitudinal analysis (need both sessions)
+    valid_longitudinal = []
+    dropped_longitudinal = []
+    for sid in metadata_df['subject_id']:
+        # Check both with and without sub- prefix
+        sid_with_sub = f"sub-{sid}" if not sid.startswith('sub-') else sid
+        if sid_with_sub not in subject_sessions or not all(ses in subject_sessions.get(sid_with_sub, []) for ses in sessions):
+            missing_sessions = [ses for ses in sessions if ses not in subject_sessions.get(sid_with_sub, [])]
+            logger.debug(
+                "Excluding subject %s from longitudinal analysis: missing session(s) %s",
+                sid, missing_sessions
+            )
+            dropped_longitudinal.append((sid, f"missing session(s): {missing_sessions}"))
+        else:
+            valid_longitudinal.append(sid)
+    
+    # Log validation results
+    logger.info("Valid subjects for group analysis: %d (%s)", len(valid_group), valid_group)
+    if dropped_group:
+        logger.info("Dropped %d subjects from group analysis: %s", len(dropped_group), dropped_group)
+    
+    logger.info("Valid subjects for longitudinal analysis: %d (%s)", len(valid_longitudinal), valid_longitudinal)
+    if dropped_longitudinal:
+        logger.info("Dropped %d subjects from longitudinal analysis: %s", len(dropped_longitudinal), dropped_longitudinal)
+    
+    return valid_group, valid_longitudinal, subject_sessions
 
 # =============================================================================
 # STATISTICAL ANALYSIS FUNCTIONS
 # =============================================================================
 
 def run_ttest(
-    fc_data_hc: List[pd.DataFrame], 
-    fc_data_ocd: List[pd.DataFrame], 
+    fc_data_hc: pd.DataFrame, 
+    fc_data_ocd: pd.DataFrame, 
+    feature_info: Dict[str, Tuple[str, str]],
     logger: logging.Logger
 ) -> pd.DataFrame:
     """Run two-sample t-tests with FDR correction for ROI-to-ROI FC."""
     logger.info(
-        "Running t-tests with %d HC subjects and %d OCD subjects",
-        len(fc_data_hc), len(fc_data_ocd)
+        "Running t-tests with %d HC subjects and %d OCD subjects for %d ROI pairs",
+        len(fc_data_hc), len(fc_data_ocd), len(feature_info)
     )
-    
-    # Get all ROI pairs from the first subject
-    if fc_data_hc:
-        roi_pairs = fc_data_hc[0][['ROI', 'network1', 'network2']].copy()
-    elif fc_data_ocd:
-        roi_pairs = fc_data_ocd[0][['ROI', 'network1', 'network2']].copy()
-    else:
-        logger.error("No data available for analysis")
-        return pd.DataFrame()
     
     results = []
     dropped_features = []
     
-    for _, row in roi_pairs.iterrows():
-        roi_pair = row['ROI']
-        network1 = row.get('network1', 'Unknown')
-        network2 = row.get('network2', 'Unknown')
+    for roi_pair, (net1, net2) in feature_info.items():
+        hc_values = fc_data_hc[fc_data_hc['ROI'] == roi_pair]['FC'].dropna()
+        ocd_values = fc_data_ocd[fc_data_ocd['ROI'] == roi_pair]['FC'].dropna()
         
-        # Extract FC values for this ROI pair
-        hc_values = []
-        ocd_values = []
-        
-        for fc_df in fc_data_hc:
-            pair_data = fc_df[fc_df['ROI'] == roi_pair]
-            if not pair_data.empty:
-                hc_values.append(pair_data['FC'].iloc[0])
-        
-        for fc_df in fc_data_ocd:
-            pair_data = fc_df[fc_df['ROI'] == roi_pair]
-            if not pair_data.empty:
-                ocd_values.append(pair_data['FC'].iloc[0])
+        logger.debug(
+            "ROI pair %s (%s_%s): HC n=%d, OCD n=%d", 
+            roi_pair, net1, net2, len(hc_values), len(ocd_values)
+        )
         
         if len(hc_values) < DEFAULT_CONFIG['min_subjects_per_group'] or \
            len(ocd_values) < DEFAULT_CONFIG['min_subjects_per_group']:
             logger.warning(
-                "Skipping ROI pair %s due to insufficient data (HC n=%d, OCD n=%d)",
-                roi_pair, len(hc_values), len(ocd_values)
+                "Skipping ROI pair %s (%s_%s) due to insufficient data (HC n=%d, OCD n=%d)",
+                roi_pair, net1, net2, len(hc_values), len(ocd_values)
             )
             dropped_features.append((roi_pair, f"HC n={len(hc_values)}, OCD n={len(ocd_values)}"))
             continue
@@ -515,8 +608,8 @@ def run_ttest(
         
         results.append({
             'ROI': roi_pair,
-            'network1': network1,
-            'network2': network2,
+            'network1': net1,
+            'network2': net2,
             'HC_mean': np.mean(hc_values),
             'OCD_mean': np.mean(ocd_values),
             'HC_std': np.std(hc_values, ddof=1),
@@ -554,18 +647,248 @@ def run_ttest(
     
     return results_df
 
-def run_longitudinal_analysis(
-    fc_data: Dict[str, Dict[str, pd.DataFrame]], 
+def run_regression(
+    fc_data: pd.DataFrame, 
+    y_values: pd.Series, 
+    feature_info: Dict[str, Tuple[str, str]],
+    analysis_name: str,
     metadata_df: pd.DataFrame,
-    clinical_df: pd.DataFrame, 
     logger: logging.Logger
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Run longitudinal analysis for ROI-to-ROI FC - following NW_group.py approach."""
-    logger.info("Performing longitudinal analysis")
+) -> pd.DataFrame:
+    """Run linear regression with condition confounder and FDR correction for ROI-to-ROI FC."""
+    logger.info(
+        "Running %s regression with condition confounder for %d subjects and %d ROI pairs",
+        analysis_name, len(fc_data), len(feature_info)
+    )
     
-    # Prepare OCD clinical data (exactly like NW_group.py)
-    ocd_df = clinical_df[
-        clinical_df['subject_id'].isin(metadata_df[metadata_df['group'] == 'OCD']['subject_id'])
+    results = []
+    dropped_features = []
+    
+    # Ensure consistent index types
+    fc_data.index = fc_data.index.astype(str)
+    y_values.index = y_values.index.astype(str)
+    
+    # Find common subjects
+    common_subjects = fc_data.index.intersection(y_values.index)
+    logger.debug(
+        "Common subjects for %s regression: %d (%s)", 
+        analysis_name, len(common_subjects), list(common_subjects)
+    )
+    
+    if not common_subjects.size:
+        logger.warning(
+            "No common subjects for %s regression. FC subjects: %s, YBOCS subjects: %s",
+            analysis_name, list(fc_data.index), list(y_values.index)
+        )
+        return pd.DataFrame()
+    
+    # Filter data to common subjects
+    fc_data = fc_data.loc[common_subjects]
+    y_values = y_values.loc[common_subjects]
+    
+    # Add condition information for OCD subjects
+    fc_data_with_condition = fc_data.reset_index()
+    fc_data_with_condition = fc_data_with_condition.merge(
+        metadata_df[['subject_id', 'condition']], 
+        left_on='subject_id', 
+        right_on='subject_id', 
+        how='left'
+    )
+    
+    # Fill missing conditions
+    fc_data_with_condition['condition'] = fc_data_with_condition['condition'].fillna('unknown')
+    
+    logger.info("Condition distribution in %s regression: %s", 
+                analysis_name, fc_data_with_condition['condition'].value_counts().to_dict())
+    
+    dropped_subjects = [sid for sid in fc_data.index if sid not in y_values.index]
+    if dropped_subjects:
+        logger.info(
+            "Dropped %d subjects from %s regression due to missing YBOCS data: %s",
+            len(dropped_subjects), analysis_name, dropped_subjects
+        )
+
+    # Run regression for each ROI pair
+    for roi_pair, (net1, net2) in feature_info.items():
+        roi_data = fc_data[fc_data['ROI'] == roi_pair]
+        if roi_data.empty:
+            logger.warning(
+                "Skipping ROI pair %s (%s_%s) in %s regression due to empty data",
+                roi_pair, net1, net2, analysis_name
+            )
+            dropped_features.append((roi_pair, "empty data"))
+            continue
+        
+        # Get FC values for this ROI pair
+        fc_values = roi_data['FC'].dropna()
+        if fc_values.empty:
+            dropped_features.append((roi_pair, "no FC data"))
+            continue
+        
+        # Get corresponding YBOCS values
+        y_vals = y_values.loc[fc_values.index].dropna()
+        logger.debug(
+            "ROI pair %s (%s_%s) in %s regression: n=%d", 
+            roi_pair, net1, net2, analysis_name, len(y_vals)
+        )
+        
+        if len(fc_values) < DEFAULT_CONFIG['min_subjects_per_group'] or \
+           len(y_vals) < DEFAULT_CONFIG['min_subjects_per_group']:
+            logger.warning(
+                "Skipping ROI pair %s (%s_%s) in %s regression due to insufficient data (n=%d)",
+                roi_pair, net1, net2, analysis_name, len(y_vals)
+            )
+            dropped_features.append((roi_pair, f"n={len(y_vals)}"))
+            continue
+        
+        # Get condition data for this ROI pair
+        roi_condition_data = fc_data_with_condition[
+            fc_data_with_condition['subject_id'].isin(fc_values.index)
+        ][['subject_id', 'FC', 'condition']].dropna()
+        
+        if len(roi_condition_data) < DEFAULT_CONFIG['min_subjects_per_group']:
+            logger.warning(
+                "Skipping ROI pair %s (%s_%s) in %s regression due to insufficient data (n=%d)",
+                roi_pair, net1, net2, analysis_name, len(roi_condition_data)
+            )
+            dropped_features.append((roi_pair, f"n={len(roi_condition_data)}"))
+            continue
+        
+        try:
+            # Perform multiple linear regression with condition as confounder
+            # Create formula for regression with condition confounder
+            # Sanitize ROI pair name for formula (remove special characters)
+            safe_roi = f"roi_{roi_pair.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')}"
+            
+            # Prepare data for regression with sanitized column names
+            regression_data = roi_condition_data.copy()
+            regression_data['y_values'] = y_vals.loc[roi_condition_data['subject_id']].values
+            regression_data[safe_roi] = regression_data['FC']
+            
+            # Create formula with sanitized names
+            formula = f"{safe_roi} ~ y_values + condition"
+            
+            # Fit the model
+            model = ols(formula, data=regression_data).fit()
+            
+            # Get FC effect (slope)
+            fc_effect = model.params.get('y_values', 0)
+            fc_pval = model.pvalues.get('y_values', 1.0)
+            
+            # Get condition effects
+            condition_effects = {}
+            condition_pvals = {}
+            for cond in regression_data['condition'].unique():
+                if cond != regression_data['condition'].iloc[0]:  # Reference condition
+                    cond_param = f"condition[T.{cond}]"
+                    condition_effects[cond] = model.params.get(cond_param, 0)
+                    condition_pvals[cond] = model.pvalues.get(cond_param, 1.0)
+            
+            # Calculate R-squared
+            r_squared = model.rsquared
+            
+            results.append({
+                'ROI': roi_pair,
+                'network1': net1,
+                'network2': net2,
+                'slope': fc_effect,
+                'intercept': model.params.get('Intercept', 0),
+                'r_value': np.sqrt(r_squared) if r_squared >= 0 else 0,
+                'r_squared': r_squared,
+                'p_value': fc_pval,
+                'n': len(regression_data),
+                'condition_effects': condition_effects,
+                'condition_pvals': condition_pvals
+            })
+            
+        except Exception as e:
+            logger.warning("Failed to run regression for ROI pair %s: %s", roi_pair, e)
+            dropped_features.append((roi_pair, f"regression error: {e}"))
+            continue
+    
+    if not results:
+        logger.warning("No valid ROI pairs for regression analysis")
+        return pd.DataFrame()
+    
+    results_df = pd.DataFrame(results)
+    
+    # Apply FDR correction
+    if len(results_df) > 1:
+        p_vals = results_df['p_value'].values
+        _, p_vals_corr = fdrcorrection(p_vals, alpha=DEFAULT_CONFIG['fdr_alpha'])
+        results_df['p_corrected'] = p_vals_corr
+        results_df['significant'] = p_vals_corr < DEFAULT_CONFIG['fdr_alpha']
+    else:
+        results_df['p_corrected'] = results_df['p_value']
+        results_df['significant'] = results_df['p_value'] < DEFAULT_CONFIG['fdr_alpha']
+    
+    logger.info("Generated regression results for %d ROI pairs", len(results_df))
+    
+    if dropped_features:
+        logger.warning("Dropped %d ROI pairs from regression analysis", len(dropped_features))
+    
+    return results_df
+
+def perform_group_analysis(
+    baseline_fc_data: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    feature_info: Dict[str, Tuple[str, str]],
+    output_dir: str,
+    atlas_name: str,
+    logger: logging.Logger
+) -> bool:
+    """Perform group difference analysis at baseline."""
+    logger.info("Performing group difference analysis at baseline for atlas: %s", atlas_name)
+    
+    # Separate HC and OCD data
+    hc_data = baseline_fc_data[
+        baseline_fc_data['subject_id'].isin(metadata_df[metadata_df['group'] == 'HC']['subject_id'])
+    ]
+    ocd_data = baseline_fc_data[
+        baseline_fc_data['subject_id'].isin(metadata_df[metadata_df['group'] == 'OCD']['subject_id'])
+    ]
+    
+    logger.info("Group t-test analysis: %d HC subjects, %d OCD subjects", len(hc_data), len(ocd_data))
+    
+    if hc_data.empty or ocd_data.empty:
+        logger.warning(
+            "Insufficient data for group t-test analysis (HC empty: %s, OCD empty: %s)",
+            hc_data.empty, ocd_data.empty
+        )
+        return False
+    
+    # Run t-tests
+    ttest_results = run_ttest(hc_data, ocd_data, feature_info, logger)
+    
+    if not ttest_results.empty:
+        output_path = os.path.join(output_dir, f'group_diff_baseline_{atlas_name}_roiroi_fc.csv')
+        ttest_results.to_csv(output_path, index=False)
+        logger.info(
+            "Saved t-test results to %s with columns: %s", 
+            output_path, list(ttest_results.columns)
+        )
+        return True
+    else:
+        logger.info("No significant t-test results to save")
+        return False
+
+def perform_longitudinal_analysis(
+    baseline_fc_data: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    df_clinical: pd.DataFrame,
+    valid_longitudinal: List[str],
+    feature_info: Dict[str, Tuple[str, str]],
+    input_dir: str,
+    output_dir: str,
+    atlas_name: str,
+    logger: logging.Logger
+) -> None:
+    """Perform longitudinal analysis for OCD subjects."""
+    logger.info("Performing longitudinal analysis for atlas: %s", atlas_name)
+    
+    # Prepare OCD clinical data
+    ocd_df = df_clinical[
+        df_clinical['subject_id'].isin(metadata_df[metadata_df['group'] == 'OCD']['subject_id'])
     ].copy()
     ocd_df['delta_ybocs'] = ocd_df['ybocs_baseline'] - ocd_df['ybocs_followup']
     
@@ -573,308 +896,227 @@ def run_longitudinal_analysis(
         "Longitudinal analysis: %d OCD subjects with YBOCS data: %s",
         len(ocd_df), list(ocd_df['subject_id'])
     )
-    
-    if ocd_df.empty:
-        logger.warning("No OCD subjects with YBOCS data for longitudinal analysis")
-        return pd.DataFrame(), pd.DataFrame()
-    
-    # Find subjects with both baseline and follow-up data
-    subjects_with_both_sessions = []
-    for subject, sessions_data in fc_data.items():
-        if 'ses-baseline' in sessions_data and 'ses-followup' in sessions_data:
-            # Only include OCD subjects with YBOCS data
-            if subject in ocd_df['subject_id'].values:
-                subjects_with_both_sessions.append(subject)
-    
-    logger.info("Found %d OCD subjects with both baseline and follow-up data", len(subjects_with_both_sessions))
-    
-    if len(subjects_with_both_sessions) < DEFAULT_CONFIG['min_subjects_per_group']:
-        logger.warning("Insufficient subjects for longitudinal analysis")
-        return pd.DataFrame(), pd.DataFrame()
-    
-    # Get all ROI pairs from the first subject
-    first_subject = subjects_with_both_sessions[0]
-    roi_pairs = fc_data[first_subject]['ses-baseline'][['ROI', 'network1', 'network2']].copy()
-    
-    baseline_fc_results = []
-    delta_fc_results = []
-    
-    for _, row in roi_pairs.iterrows():
-        roi_pair = row['ROI']
-        network1 = row.get('network1', 'Unknown')
-        network2 = row.get('network2', 'Unknown')
-        
-        baseline_fc_values = []
-        delta_ybocs_values = []
-        delta_fc_values = []
-        
-        for subject in subjects_with_both_sessions:
-            # Get YBOCS data for this subject
-            subject_ybocs = ocd_df[ocd_df['subject_id'] == subject]
-            if subject_ybocs.empty:
-                continue
-                
-            delta_ybocs = subject_ybocs['delta_ybocs'].iloc[0]
-            
-            # Get baseline FC value
-            baseline_fc_df = fc_data[subject]['ses-baseline']
-            baseline_pair = baseline_fc_df[baseline_fc_df['ROI'] == roi_pair]
-            
-            if not baseline_pair.empty:
-                baseline_fc = baseline_pair['FC'].iloc[0]
-                baseline_fc_values.append(baseline_fc)
-                delta_ybocs_values.append(delta_ybocs)
-            
-            # Get FC change
-            followup_fc_df = fc_data[subject]['ses-followup']
-            followup_pair = followup_fc_df[followup_fc_df['ROI'] == roi_pair]
-            
-            if not baseline_pair.empty and not followup_pair.empty:
-                baseline_fc = baseline_pair['FC'].iloc[0]
-                followup_fc = followup_pair['FC'].iloc[0]
-                delta_fc = followup_fc - baseline_fc
-                delta_fc_values.append(delta_fc)
-        
-        # Baseline FC vs Delta YBOCS
-        if len(baseline_fc_values) > 2 and len(delta_ybocs_values) > 2:
-            r, p = stats.pearsonr(baseline_fc_values, delta_ybocs_values)
-            baseline_fc_results.append({
-                'ROI': roi_pair,
-                'network1': network1,
-                'network2': network2,
-                'correlation': r,
-                'p_value': p,
-                'n_subjects': len(baseline_fc_values)
-            })
-        
-        # Delta FC vs Delta YBOCS
-        if len(delta_fc_values) > 2 and len(delta_ybocs_values) > 2:
-            r, p = stats.pearsonr(delta_fc_values, delta_ybocs_values)
-            delta_fc_results.append({
-                'ROI': roi_pair,
-                'network1': network1,
-                'network2': network2,
-                'correlation': r,
-                'p_value': p,
-                'n_subjects': len(delta_fc_values)
-            })
-    
-    baseline_df = pd.DataFrame(baseline_fc_results)
-    delta_df = pd.DataFrame(delta_fc_results)
-    
-    # Apply FDR correction
-    if len(baseline_df) > 1:
-        _, p_vals_corr = fdrcorrection(baseline_df['p_value'].values, alpha=DEFAULT_CONFIG['fdr_alpha'])
-        baseline_df['p_corrected'] = p_vals_corr
-        baseline_df['significant'] = p_vals_corr < DEFAULT_CONFIG['fdr_alpha']
-    elif len(baseline_df) == 1:
-        baseline_df['p_corrected'] = baseline_df['p_value']
-        baseline_df['significant'] = baseline_df['p_value'] < DEFAULT_CONFIG['fdr_alpha']
-    
-    if len(delta_df) > 1:
-        _, p_vals_corr = fdrcorrection(delta_df['p_value'].values, alpha=DEFAULT_CONFIG['fdr_alpha'])
-        delta_df['p_corrected'] = p_vals_corr
-        delta_df['significant'] = p_vals_corr < DEFAULT_CONFIG['fdr_alpha']
-    elif len(delta_df) == 1:
-        delta_df['p_corrected'] = delta_df['p_value']
-        delta_df['significant'] = delta_df['p_value'] < DEFAULT_CONFIG['fdr_alpha']
-    
-    logger.info("Longitudinal analysis complete: %d baseline FC correlations, %d delta FC correlations", 
-                len(baseline_df), len(delta_df))
-    
-    return baseline_df, delta_df
 
-# =============================================================================
-# MAIN ANALYSIS FUNCTIONS
-# =============================================================================
+    # 1. Baseline FC vs symptom change
+    baseline_fc_ocd = baseline_fc_data[
+        baseline_fc_data['subject_id'].isin(ocd_df['subject_id'])
+    ]
+    
+    logger.info(
+        "Baseline FC vs delta YBOCS regression: %d OCD subjects with FC data: %s",
+        len(baseline_fc_ocd), list(baseline_fc_ocd['subject_id'])
+    )
+    
+    if not baseline_fc_ocd.empty:
+        regression_results = run_regression(
+            baseline_fc_ocd.set_index('subject_id'),
+            ocd_df.set_index('subject_id')['delta_ybocs'],
+            feature_info,
+            "baseline FC vs delta YBOCS",
+            metadata_df,
+            logger
+        )
+        
+        if not regression_results.empty:
+            output_path = os.path.join(output_dir, f'baselineFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
+            regression_results.to_csv(output_path, index=False)
+            logger.info(
+                "Saved baseline FC regression results to %s with columns: %s", 
+                output_path, list(regression_results.columns)
+            )
+        else:
+            logger.info("No significant baseline FC regression results to save")
+    else:
+        logger.warning("No baseline FC data for OCD subjects in longitudinal analysis")
 
-def perform_group_difference_analysis(
-    fc_data: Dict[str, Dict[str, pd.DataFrame]], 
-    metadata_df: pd.DataFrame, 
-    atlas_name: str, 
-    logger: logging.Logger
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Perform group difference analysis at baseline and follow-up."""
-    logger.info("Performing group difference analysis for atlas: %s", atlas_name)
+    # 2. FC change vs symptom change
+    logger.info("Analyzing FC change vs symptom change")
+    fc_change_data = []
+    dropped_longitudinal_subjects = []
     
-    # Separate HC and OCD data for baseline
-    hc_baseline_data = []
-    ocd_baseline_data = []
-    
-    for subject, sessions_data in fc_data.items():
-        if 'ses-baseline' not in sessions_data:
+    for sid in valid_longitudinal:
+        # Ensure subject ID has sub- prefix for file naming
+        sid_with_sub = f"sub-{sid}" if not sid.startswith('sub-') else sid
+        base_path = os.path.join(input_dir, f'{sid_with_sub}_ses-baseline_task-rest_{atlas_name}_roiroi_fc_avg.csv')
+        follow_path = os.path.join(input_dir, f'{sid_with_sub}_ses-followup_task-rest_{atlas_name}_roiroi_fc_avg.csv')
+        
+        if not (os.path.exists(base_path) and os.path.exists(follow_path)):
+            logger.warning(
+                "Missing ROI-to-ROI FC files for subject %s (baseline: %s, followup: %s)",
+                sid, os.path.exists(base_path), os.path.exists(follow_path)
+            )
+            dropped_longitudinal_subjects.append(
+                (sid, f"missing files: baseline={os.path.exists(base_path)}, followup={os.path.exists(follow_path)}")
+            )
             continue
         
-        group = get_group(subject, metadata_df)
-        if group == 'HC':
-            hc_baseline_data.append(sessions_data['ses-baseline'])
-        elif group == 'OCD':
-            ocd_baseline_data.append(sessions_data['ses-baseline'])
-    
-    logger.info("Baseline group t-test analysis: %d HC subjects, %d OCD subjects", 
-                len(hc_baseline_data), len(ocd_baseline_data))
-    
-    baseline_results = pd.DataFrame()
-    if hc_baseline_data and ocd_baseline_data:
-        baseline_results = run_ttest(hc_baseline_data, ocd_baseline_data, logger)
-    
-    # Separate HC and OCD data for follow-up
-    hc_followup_data = []
-    ocd_followup_data = []
-    
-    for subject, sessions_data in fc_data.items():
-        if 'ses-followup' not in sessions_data:
+        if not (validate_roiroi_fc_file(base_path, logger) and validate_roiroi_fc_file(follow_path, logger)):
+            dropped_longitudinal_subjects.append((sid, "invalid FC file format"))
             continue
         
-        group = get_group(subject, metadata_df)
-        if group == 'HC':
-            hc_followup_data.append(sessions_data['ses-followup'])
-        elif group == 'OCD':
-            ocd_followup_data.append(sessions_data['ses-followup'])
-    
-    logger.info("Follow-up group t-test analysis: %d HC subjects, %d OCD subjects", 
-                len(hc_followup_data), len(ocd_followup_data))
-    
-    followup_results = pd.DataFrame()
-    if hc_followup_data and ocd_followup_data:
-        followup_results = run_ttest(hc_followup_data, ocd_followup_data, logger)
-    
-    return baseline_results, followup_results
+        try:
+            # Load baseline and followup data
+            base_fc = pd.read_csv(base_path)
+            follow_fc = pd.read_csv(follow_path)
+            
+            logger.debug(
+                "Loaded baseline ROI-to-ROI FC (%d rows) and followup FC (%d rows) for %s",
+                len(base_fc), len(follow_fc), sid
+            )
+            
+            # Calculate FC change
+            change_data = base_fc.copy()
+            change_data['FC'] = follow_fc['FC'] - base_fc['FC']
+            change_data['subject_id'] = sid  # Use original subject ID without sub- prefix
+            fc_change_data.append(change_data)
+            
+        except Exception as e:
+            logger.error(
+                "Failed to process longitudinal ROI-to-ROI FC for subject %s: %s", 
+                sid, e
+            )
+            dropped_longitudinal_subjects.append((sid, f"processing error: {e}"))
+            continue
 
-def save_results(
-    baseline_results: pd.DataFrame, 
-    followup_results: pd.DataFrame, 
-    baseline_fc_results: pd.DataFrame, 
-    delta_fc_results: pd.DataFrame, 
-    atlas_name: str, 
-    output_dir: str, 
-    logger: logging.Logger
-) -> None:
-    """Save all results to CSV files."""
-    logger.info("Saving results...")
+    if dropped_longitudinal_subjects:
+        logger.info(
+            "Dropped %d subjects from FC change analysis: %s",
+            len(dropped_longitudinal_subjects), dropped_longitudinal_subjects
+        )
     
-    # Save baseline group comparison results
-    if not baseline_results.empty:
-        baseline_file = os.path.join(output_dir, f'group_diff_baseline_{atlas_name}_roiroi_fc.csv')
-        baseline_results.to_csv(baseline_file, index=False)
-        logger.info("Saved baseline group comparison results: %s", baseline_file)
+    if fc_change_data:
+        fc_change_data = pd.concat(fc_change_data, ignore_index=True)
+        fc_change_data['subject_id'] = fc_change_data['subject_id'].astype(str)
+        
+        logger.info(
+            "Loaded ROI-to-ROI FC change data for %d subjects, %d ROI pairs: %s",
+            len(fc_change_data['subject_id'].unique()), len(fc_change_data),
+            list(fc_change_data['subject_id'].unique())
+        )
+        
+        # Run regression analysis
+        regression_results = run_regression(
+            fc_change_data.set_index('subject_id'),
+            ocd_df.set_index('subject_id')['delta_ybocs'],
+            feature_info,
+            "delta FC vs delta YBOCS",
+            metadata_df,
+            logger
+        )
+        
+        if not regression_results.empty:
+            output_path = os.path.join(output_dir, f'deltaFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
+            regression_results.to_csv(output_path, index=False)
+            logger.info(
+                "Saved FC change regression results to %s with columns: %s", 
+                output_path, list(regression_results.columns)
+            )
+        else:
+            logger.info("No significant FC change regression results to save")
     else:
-        logger.info("No baseline group comparison results to save")
-    
-    # Save follow-up group comparison results
-    if not followup_results.empty:
-        followup_file = os.path.join(output_dir, f'group_diff_followup_{atlas_name}_roiroi_fc.csv')
-        followup_results.to_csv(followup_file, index=False)
-        logger.info("Saved follow-up group comparison results: %s", followup_file)
-    else:
-        logger.info("No follow-up group comparison results to save")
-    
-    # Save baseline FC vs delta YBOCS results
-    if not baseline_fc_results.empty:
-        baseline_fc_file = os.path.join(output_dir, f'baselineFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
-        baseline_fc_results.to_csv(baseline_fc_file, index=False)
-        logger.info("Saved baseline FC vs delta YBOCS results: %s", baseline_fc_file)
-    else:
-        logger.info("No baseline FC vs delta YBOCS results to save")
-    
-    # Save delta FC vs delta YBOCS results
-    if not delta_fc_results.empty:
-        delta_fc_file = os.path.join(output_dir, f'deltaFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
-        delta_fc_results.to_csv(delta_fc_file, index=False)
-        logger.info("Saved delta FC vs delta YBOCS results: %s", delta_fc_file)
-    else:
-        logger.info("No delta FC vs delta YBOCS results to save")
-    
-    # Create summary
-    summary_data = {
-        'Analysis': ['Baseline Group Comparison', 'Follow-up Group Comparison', 
-                    'Baseline FC vs Delta YBOCS', 'Delta FC vs Delta YBOCS'],
-        'ROI_Pairs': [len(baseline_results), len(followup_results), 
-                     len(baseline_fc_results), len(delta_fc_results)],
-        'Significant_Pairs': [
-            baseline_results['significant'].sum() if not baseline_results.empty else 0,
-            followup_results['significant'].sum() if not followup_results.empty else 0,
-            baseline_fc_results['significant'].sum() if not baseline_fc_results.empty else 0,
-            delta_fc_results['significant'].sum() if not delta_fc_results.empty else 0
-        ]
-    }
-    
-    summary_df = pd.DataFrame(summary_data)
-    summary_file = os.path.join(output_dir, f'summary_{atlas_name}_roiroi_fc.csv')
-    summary_df.to_csv(summary_file, index=False)
-    logger.info("Saved summary: %s", summary_file)
+        logger.warning("No ROI-to-ROI FC change data loaded for longitudinal analysis")
 
 # =============================================================================
-# MAIN FUNCTION
+# MAIN EXECUTION
 # =============================================================================
 
 def main():
-    """Main function."""
+    """Main function to run ROI-to-ROI FC group analysis."""
+    # Parse arguments
     args = parse_arguments()
     
-    # Set up logging
+    # Setup logging (will be updated with atlas name after detection)
     logger = setup_logging(args.output_dir, DEFAULT_CONFIG['log_file'])
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
     
     logger.info("=" * 80)
     logger.info("Starting ROI-to-ROI Functional Connectivity Group Analysis")
     logger.info("=" * 80)
+    logger.info("Arguments: %s", vars(args))
     
-    # Create output directory
-    os.makedirs(args.output_dir, exist_ok=True)
-    
-    # Load metadata
-    logger.info("Loading metadata files...")
     try:
-        metadata_df, clinical_df = load_metadata(args.subjects_csv, args.clinical_csv, logger)
+        # Create output directory
+        os.makedirs(args.output_dir, exist_ok=True)
+        
+        # Load metadata
+        df, df_clinical = load_and_validate_metadata(args.subjects_csv, args.clinical_csv, logger)
+
+        # Normalize subject IDs
+        df['subject_id'] = df['subject_id'].str.replace('sub-', '')
+        df_clinical['subject_id'] = df_clinical['subject_id'].str.replace('sub-', '')
+        logger.debug("Normalized subject IDs in metadata")
+
+        # Determine atlas name
+        if args.atlas_name:
+            atlas_name = args.atlas_name
+            logger.info("Using explicitly specified atlas name: %s", atlas_name)
+        elif args.auto_detect_atlas:
+            atlas_name = detect_atlas_name_from_files(args.input_dir, logger)
+            logger.info("Auto-detected atlas name: %s", atlas_name)
+        else:
+            atlas_name = DEFAULT_CONFIG['default_atlas_name']
+            logger.info("Using default atlas name: %s", atlas_name)
+        
+        # Validate atlas name
+        if not validate_atlas_name(args.input_dir, atlas_name, logger):
+            raise ValueError(f"Invalid atlas name: {atlas_name}")
+        
+        logger.info("Using atlas: %s", atlas_name)
+        
+        # Update log file name to include atlas name
+        atlas_log_file = f'roiroi_fc_analysis_{atlas_name}.log'
+        logger.info("Switching to atlas-specific log file: %s", atlas_log_file)
+        
+        # Create new logger with atlas-specific log file
+        atlas_logger = setup_logging(args.output_dir, atlas_log_file)
+        if args.verbose:
+            atlas_logger.setLevel(logging.DEBUG)
+        
+        # Validate subjects
+        valid_group, valid_longitudinal, subject_sessions = validate_subjects(
+            args.input_dir, df, atlas_name, atlas_logger
+        )
+        
+        if not valid_group and not valid_longitudinal:
+            dir_contents = os.listdir(args.input_dir) if os.path.exists(args.input_dir) else []
+            atlas_logger.error(
+                "No valid subjects found for any analysis. Check input directory %s (contents: %s) and FC file generation from NW_1st.py.",
+                args.input_dir, dir_contents
+            )
+            raise ValueError("No valid subjects found for any analysis. Check input directory and FC file generation.")
+
+        # Load baseline ROI-to-ROI FC data
+        baseline_fc_data, feature_info = load_roiroi_fc_data(
+            valid_group, 'ses-baseline', args.input_dir, atlas_name, atlas_logger
+        )
+        
+        if baseline_fc_data.empty:
+            atlas_logger.warning("No baseline ROI-to-ROI FC data loaded. Skipping group and longitudinal analyses.")
+            return
+
+        # 1. Group difference at baseline
+        if valid_group:
+            perform_group_analysis(baseline_fc_data, df, feature_info, args.output_dir, atlas_name, atlas_logger)
+
+        # 2. Longitudinal analyses
+        if valid_longitudinal:
+            perform_longitudinal_analysis(
+                baseline_fc_data, df, df_clinical, valid_longitudinal, 
+                feature_info, args.input_dir, args.output_dir, atlas_name, atlas_logger
+            )
+
+        atlas_logger.info("Main ROI-to-ROI FC analysis completed successfully for atlas: %s", atlas_name)
+        atlas_logger.info("Analyses completed: Group comparison, Longitudinal analysis")
+    
     except Exception as e:
-        logger.error("Failed to load metadata: %s", e)
-        return
+        logger.error("Main execution failed: %s", e)
+        raise
     
-    # Detect or validate atlas
-    if args.atlas_name:
-        atlas_name = args.atlas_name
-        if not validate_atlas_files(args.input_dir, atlas_name, logger):
-            logger.error("Atlas validation failed")
-            return
-    elif args.auto_detect_atlas:
-        atlas_name = detect_atlas_from_files(args.input_dir, logger)
-        if not atlas_name:
-            logger.error("Atlas auto-detection failed")
-            return
-    else:
-        atlas_name = DEFAULT_CONFIG['default_atlas_name']
-        if not validate_atlas_files(args.input_dir, atlas_name, logger):
-            logger.error("Default atlas validation failed")
-            return
-    
-    logger.info("Using atlas: %s", atlas_name)
-    
-    # Load FC data
-    fc_data = load_roiroi_fc_data(args.input_dir, atlas_name, logger)
-    if not fc_data:
-        logger.error("Failed to load FC data")
-        return
-    
-    # Perform group difference analysis
-    baseline_results, followup_results = perform_group_difference_analysis(
-        fc_data, metadata_df, atlas_name, logger
-    )
-    
-    # Perform longitudinal analysis
-    baseline_fc_results, delta_fc_results = run_longitudinal_analysis(
-        fc_data, metadata_df, clinical_df, logger
-    )
-    
-    # Save results
-    save_results(
-        baseline_results, followup_results, 
-        baseline_fc_results, delta_fc_results, 
-        atlas_name, args.output_dir, logger
-    )
-    
-    logger.info("=" * 80)
-    logger.info("Analysis complete!")
-    logger.info("=" * 80)
+    finally:
+        logger.info("=" * 80)
+        logger.info("Analysis complete!")
+        logger.info("=" * 80)
 
 if __name__ == "__main__":
     main()
