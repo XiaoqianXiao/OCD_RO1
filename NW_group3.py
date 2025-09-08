@@ -484,9 +484,9 @@ def run_ttest(
     
     # Get all ROI pairs from the first subject
     if fc_data_hc:
-        roi_pairs = fc_data_hc[0][['ROI1', 'ROI2']].copy()
+        roi_pairs = fc_data_hc[0][['ROI', 'network1', 'network2']].copy()
     elif fc_data_ocd:
-        roi_pairs = fc_data_ocd[0][['ROI1', 'ROI2']].copy()
+        roi_pairs = fc_data_ocd[0][['ROI', 'network1', 'network2']].copy()
     else:
         logger.error("No data available for analysis")
         return pd.DataFrame()
@@ -495,43 +495,31 @@ def run_ttest(
     dropped_features = []
     
     for _, row in roi_pairs.iterrows():
-        roi1, roi2 = row['ROI1'], row['ROI2']
-        
-        # Extract network information if available
-        network1 = row.get('network1', 'Unknown') if 'network1' in row else 'Unknown'
-        network2 = row.get('network2', 'Unknown') if 'network2' in row else 'Unknown'
+        roi_pair = row['ROI']
+        network1 = row.get('network1', 'Unknown')
+        network2 = row.get('network2', 'Unknown')
         
         # Extract FC values for this ROI pair
         hc_values = []
         ocd_values = []
         
         for fc_df in fc_data_hc:
-            pair_data = fc_df[(fc_df['ROI1'] == roi1) & (fc_df['ROI2'] == roi2)]
+            pair_data = fc_df[fc_df['ROI'] == roi_pair]
             if not pair_data.empty:
-                hc_values.append(pair_data['fc_value'].iloc[0])
-                # Get network info from first available data
-                if network1 == 'Unknown' and 'network1' in pair_data.columns:
-                    network1 = pair_data['network1'].iloc[0]
-                if network2 == 'Unknown' and 'network2' in pair_data.columns:
-                    network2 = pair_data['network2'].iloc[0]
+                hc_values.append(pair_data['FC'].iloc[0])
         
         for fc_df in fc_data_ocd:
-            pair_data = fc_df[(fc_df['ROI1'] == roi1) & (fc_df['ROI2'] == roi2)]
+            pair_data = fc_df[fc_df['ROI'] == roi_pair]
             if not pair_data.empty:
-                ocd_values.append(pair_data['fc_value'].iloc[0])
-                # Get network info from first available data
-                if network1 == 'Unknown' and 'network1' in pair_data.columns:
-                    network1 = pair_data['network1'].iloc[0]
-                if network2 == 'Unknown' and 'network2' in pair_data.columns:
-                    network2 = pair_data['network2'].iloc[0]
+                ocd_values.append(pair_data['FC'].iloc[0])
         
         if len(hc_values) < DEFAULT_CONFIG['min_subjects_per_group'] or \
            len(ocd_values) < DEFAULT_CONFIG['min_subjects_per_group']:
             logger.warning(
-                "Skipping ROI pair %s-%s due to insufficient data (HC n=%d, OCD n=%d)",
-                roi1, roi2, len(hc_values), len(ocd_values)
+                "Skipping ROI pair %s due to insufficient data (HC n=%d, OCD n=%d)",
+                roi_pair, len(hc_values), len(ocd_values)
             )
-            dropped_features.append((f"{roi1}-{roi2}", f"HC n={len(hc_values)}, OCD n={len(ocd_values)}"))
+            dropped_features.append((roi_pair, f"HC n={len(hc_values)}, OCD n={len(ocd_values)}"))
             continue
         
         # Perform t-test
@@ -544,8 +532,7 @@ def run_ttest(
         cohens_d = (np.mean(hc_values) - np.mean(ocd_values)) / pooled_std if pooled_std > 0 else 0
         
         results.append({
-            'ROI1': roi1,
-            'ROI2': roi2,
+            'ROI': roi_pair,
             'network1': network1,
             'network2': network2,
             'HC_mean': np.mean(hc_values),
@@ -607,17 +594,15 @@ def run_longitudinal_analysis(
     
     # Get all ROI pairs from the first subject
     first_subject = subjects_with_both_sessions[0]
-    roi_pairs = fc_data[first_subject]['ses-baseline'][['ROI1', 'ROI2']].copy()
+    roi_pairs = fc_data[first_subject]['ses-baseline'][['ROI', 'network1', 'network2']].copy()
     
     baseline_fc_results = []
     delta_fc_results = []
     
     for _, row in roi_pairs.iterrows():
-        roi1, roi2 = row['ROI1'], row['ROI2']
-        
-        # Extract network information if available
-        network1 = row.get('network1', 'Unknown') if 'network1' in row else 'Unknown'
-        network2 = row.get('network2', 'Unknown') if 'network2' in row else 'Unknown'
+        roi_pair = row['ROI']
+        network1 = row.get('network1', 'Unknown')
+        network2 = row.get('network2', 'Unknown')
         
         baseline_fc_values = []
         delta_ybocs_values = []
@@ -631,25 +616,20 @@ def run_longitudinal_analysis(
                 
                 # Get baseline FC value
                 baseline_fc_df = fc_data[subject]['ses-baseline']
-                baseline_pair = baseline_fc_df[(baseline_fc_df['ROI1'] == roi1) & (baseline_fc_df['ROI2'] == roi2)]
+                baseline_pair = baseline_fc_df[baseline_fc_df['ROI'] == roi_pair]
                 
                 if not baseline_pair.empty:
-                    baseline_fc = baseline_pair['fc_value'].iloc[0]
+                    baseline_fc = baseline_pair['FC'].iloc[0]
                     baseline_fc_values.append(baseline_fc)
                     delta_ybocs_values.append(delta_ybocs)
-                    # Get network info from first available data
-                    if network1 == 'Unknown' and 'network1' in baseline_pair.columns:
-                        network1 = baseline_pair['network1'].iloc[0]
-                    if network2 == 'Unknown' and 'network2' in baseline_pair.columns:
-                        network2 = baseline_pair['network2'].iloc[0]
                 
                 # Get FC change
                 followup_fc_df = fc_data[subject]['ses-followup']
-                followup_pair = followup_fc_df[(followup_fc_df['ROI1'] == roi1) & (followup_fc_df['ROI2'] == roi2)]
+                followup_pair = followup_fc_df[followup_fc_df['ROI'] == roi_pair]
                 
                 if not baseline_pair.empty and not followup_pair.empty:
-                    baseline_fc = baseline_pair['fc_value'].iloc[0]
-                    followup_fc = followup_pair['fc_value'].iloc[0]
+                    baseline_fc = baseline_pair['FC'].iloc[0]
+                    followup_fc = followup_pair['FC'].iloc[0]
                     delta_fc = followup_fc - baseline_fc
                     delta_fc_values.append(delta_fc)
         
@@ -657,8 +637,7 @@ def run_longitudinal_analysis(
         if len(baseline_fc_values) > 2 and len(delta_ybocs_values) > 2:
             r, p = stats.pearsonr(baseline_fc_values, delta_ybocs_values)
             baseline_fc_results.append({
-                'ROI1': roi1,
-                'ROI2': roi2,
+                'ROI': roi_pair,
                 'network1': network1,
                 'network2': network2,
                 'correlation': r,
@@ -670,8 +649,7 @@ def run_longitudinal_analysis(
         if len(delta_fc_values) > 2 and len(delta_ybocs_values) > 2:
             r, p = stats.pearsonr(delta_fc_values, delta_ybocs_values)
             delta_fc_results.append({
-                'ROI1': roi1,
-                'ROI2': roi2,
+                'ROI': roi_pair,
                 'network1': network1,
                 'network2': network2,
                 'correlation': r,
