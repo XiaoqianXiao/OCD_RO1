@@ -37,6 +37,7 @@ ATLAS_PARAMS=${2:-'{}'}  # Default to empty JSON if not provided
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=32G
 #SBATCH --account=def-jfeusner
+#SBATCH --partition=cpubase_bycore_b5
 
 
 
