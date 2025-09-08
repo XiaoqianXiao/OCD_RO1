@@ -132,11 +132,32 @@ import argparse
 import logging
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
+import psutil
+import gc
 import warnings
 import sys
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
+
+def log_memory_usage(logger: logging.Logger, stage: str):
+    """Log current memory usage for debugging OOM issues."""
+    try:
+        process = psutil.Process(os.getpid())
+        memory_info = process.memory_info()
+        memory_mb = memory_info.rss / (1024 * 1024)
+        memory_gb = memory_mb / 1024
+        logger.info(f"MEMORY [{stage}]: {memory_mb:.1f} MB ({memory_gb:.2f} GB)")
+    except Exception as e:
+        logger.warning(f"Could not get memory info: {e}")
+
+def log_dataframe_info(logger: logging.Logger, df: pd.DataFrame, name: str):
+    """Log DataFrame information for debugging."""
+    try:
+        memory_usage = df.memory_usage(deep=True).sum() / (1024 * 1024)
+        logger.info(f"DataFrame [{name}]: {df.shape[0]} rows × {df.shape[1]} columns, {memory_usage:.1f} MB")
+    except Exception as e:
+        logger.warning(f"Could not get DataFrame info for {name}: {e}")
 
 # =============================================================================
 # CONFIGURATION
@@ -888,6 +909,8 @@ def load_roiroi_fc_data(
         len(subject_ids), session, atlas_name, subject_ids
     )
     
+    log_memory_usage(logger, "START_DATA_LOADING")
+    
     fc_data = []
     feature_info = None
     valid_subjects = []
@@ -907,8 +930,10 @@ def load_roiroi_fc_data(
             continue
         
         try:
+            logger.debug("Loading FC file: %s", fc_path)
             fc_df = pd.read_csv(fc_path)
             logger.debug("Loaded ROI-to-ROI FC file %s with %d rows", fc_path, len(fc_df))
+            log_dataframe_info(logger, fc_df, f"raw_data_{sid}")
             
             # Create feature identifier and map networks (same as NW_group3.py)
             fc_df['feature_id'] = fc_df['ROI']
@@ -924,20 +949,34 @@ def load_roiroi_fc_data(
                 )
             
             # Pivot to make features as columns (same as NW_group3.py)
+            logger.debug("Starting pivot_table operation for subject %s", sid)
+            log_memory_usage(logger, f"BEFORE_PIVOT_{sid}")
+            
             fc_pivot = fc_df.pivot_table(
                 index=None,
                 columns='feature_id',
                 values='FC'
             ).reset_index(drop=True)
+            
+            log_memory_usage(logger, f"AFTER_PIVOT_{sid}")
+            log_dataframe_info(logger, fc_pivot, f"pivoted_data_{sid}")
+            
             fc_pivot['subject_id'] = sid_no_prefix
             fc_data.append(fc_pivot)
             valid_subjects.append(sid)
+            
+            # Log progress every 10 subjects
+            if len(valid_subjects) % 10 == 0:
+                logger.info("Processed %d/%d subjects", len(valid_subjects), len(subject_ids))
+                log_memory_usage(logger, f"PROGRESS_{len(valid_subjects)}")
+                gc.collect()  # Force garbage collection
             
         except Exception as e:
             logger.error(
                 "Failed to process ROI-to-ROI FC file %s for subject %s: %s", 
                 fc_path, sid, e
             )
+            log_memory_usage(logger, f"ERROR_{sid}")
             dropped_subjects.append((sid, f"processing error: {e}"))
             continue
     
@@ -951,11 +990,22 @@ def load_roiroi_fc_data(
         logger.warning("No valid ROI-to-ROI FC data loaded for session %s", session)
         return pd.DataFrame(), feature_info
     
-    fc_data_df = pd.concat(fc_data, ignore_index=True)
-    logger.info(
-        "Loaded ROI-to-ROI FC data for %d subjects, %d ROI pairs: %s",
-        len(valid_subjects), len(feature_info), valid_subjects
-    )
+    log_memory_usage(logger, "BEFORE_CONCAT")
+    logger.info("About to concatenate %d DataFrames", len(fc_data))
+    
+    try:
+        fc_data_df = pd.concat(fc_data, ignore_index=True)
+        log_memory_usage(logger, "AFTER_CONCAT")
+        log_dataframe_info(logger, fc_data_df, "final_combined_data")
+        
+        logger.info(
+            "Loaded ROI-to-ROI FC data for %d subjects, %d ROI pairs: %s",
+            len(valid_subjects), len(feature_info), valid_subjects
+        )
+    except Exception as e:
+        logger.error("Failed to concatenate DataFrames: %s", e)
+        log_memory_usage(logger, "CONCAT_ERROR")
+        raise
     
     return fc_data_df, feature_info
 
@@ -1430,6 +1480,7 @@ def main():
     logger.info("=" * 80)
     logger.info("Starting ROI-to-ROI FC Group Analysis")
     logger.info("=" * 80)
+    log_memory_usage(logger, "SCRIPT_START")
     logger.info("Arguments: %s", vars(args))
     
     try:
@@ -1484,9 +1535,12 @@ def main():
             raise ValueError("No valid subjects found for any analysis. Check input directory and FC file generation.")
 
         # Load baseline ROI-to-ROI FC data
+        atlas_logger.info("Loading baseline ROI-to-ROI FC data...")
+        log_memory_usage(atlas_logger, "BEFORE_BASELINE_LOAD")
         baseline_fc_data, feature_info = load_roiroi_fc_data(
             valid_group, 'ses-baseline', args.input_dir, atlas_name, atlas_logger
         )
+        log_memory_usage(atlas_logger, "AFTER_BASELINE_LOAD")
         
         if baseline_fc_data.empty:
             atlas_logger.warning("No baseline ROI-to-ROI FC data loaded. Skipping group and longitudinal analyses.")
@@ -1697,6 +1751,14 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error("Main execution failed: %s", e)
         print(f"\nError: {e}")
+        # Try to log memory usage even if main logging failed
+        try:
+            process = psutil.Process(os.getpid())
+            memory_info = process.memory_info()
+            memory_mb = memory_info.rss / (1024 * 1024)
+            logging.error("Memory at failure: %.1f MB (%.2f GB)", memory_mb, memory_mb/1024)
+        except:
+            pass
         print("\nFor help, run: python NW_group3.py --help")
         print("For usage examples, run: python NW_group3.py --usage")
         raise
