@@ -312,25 +312,7 @@ def get_group(subject_id: str, metadata_df: pd.DataFrame) -> Optional[str]:
     
     return group.iloc[0]
 
-def get_ybocs_scores(subject_id: str, clinical_df: pd.DataFrame) -> Tuple[Optional[float], Optional[float]]:
-    """Get YBOCS scores for baseline and follow-up sessions."""
-    if subject_id.startswith('sub-'):
-        subject_id = subject_id.replace('sub-', '')
-    
-    subject_data = clinical_df[clinical_df['subject_id'] == subject_id]
-    if subject_data.empty:
-        return None, None
-    
-    baseline_score = None
-    followup_score = None
-    
-    for _, row in subject_data.iterrows():
-        if row['session'] == 'baseline':
-            baseline_score = row['ybocs_total']
-        elif row['session'] == 'followup':
-            followup_score = row['ybocs_total']
-    
-    return baseline_score, followup_score
+# Remove the get_ybocs_scores function - we'll handle this directly in the longitudinal analysis like NW_group.py
 
 # =============================================================================
 # DATA LOADING FUNCTIONS
@@ -574,19 +556,37 @@ def run_ttest(
 
 def run_longitudinal_analysis(
     fc_data: Dict[str, Dict[str, pd.DataFrame]], 
+    metadata_df: pd.DataFrame,
     clinical_df: pd.DataFrame, 
     logger: logging.Logger
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Run longitudinal analysis for ROI-to-ROI FC."""
+    """Run longitudinal analysis for ROI-to-ROI FC - following NW_group.py approach."""
     logger.info("Performing longitudinal analysis")
+    
+    # Prepare OCD clinical data (exactly like NW_group.py)
+    ocd_df = clinical_df[
+        clinical_df['subject_id'].isin(metadata_df[metadata_df['group'] == 'OCD']['subject_id'])
+    ].copy()
+    ocd_df['delta_ybocs'] = ocd_df['ybocs_baseline'] - ocd_df['ybocs_followup']
+    
+    logger.info(
+        "Longitudinal analysis: %d OCD subjects with YBOCS data: %s",
+        len(ocd_df), list(ocd_df['subject_id'])
+    )
+    
+    if ocd_df.empty:
+        logger.warning("No OCD subjects with YBOCS data for longitudinal analysis")
+        return pd.DataFrame(), pd.DataFrame()
     
     # Find subjects with both baseline and follow-up data
     subjects_with_both_sessions = []
     for subject, sessions_data in fc_data.items():
         if 'ses-baseline' in sessions_data and 'ses-followup' in sessions_data:
-            subjects_with_both_sessions.append(subject)
+            # Only include OCD subjects with YBOCS data
+            if subject in ocd_df['subject_id'].values:
+                subjects_with_both_sessions.append(subject)
     
-    logger.info("Found %d subjects with both baseline and follow-up data", len(subjects_with_both_sessions))
+    logger.info("Found %d OCD subjects with both baseline and follow-up data", len(subjects_with_both_sessions))
     
     if len(subjects_with_both_sessions) < DEFAULT_CONFIG['min_subjects_per_group']:
         logger.warning("Insufficient subjects for longitudinal analysis")
@@ -609,29 +609,31 @@ def run_longitudinal_analysis(
         delta_fc_values = []
         
         for subject in subjects_with_both_sessions:
-            baseline_score, followup_score = get_ybocs_scores(subject, clinical_df)
+            # Get YBOCS data for this subject
+            subject_ybocs = ocd_df[ocd_df['subject_id'] == subject]
+            if subject_ybocs.empty:
+                continue
+                
+            delta_ybocs = subject_ybocs['delta_ybocs'].iloc[0]
             
-            if baseline_score is not None and followup_score is not None:
-                delta_ybocs = followup_score - baseline_score
-                
-                # Get baseline FC value
-                baseline_fc_df = fc_data[subject]['ses-baseline']
-                baseline_pair = baseline_fc_df[baseline_fc_df['ROI'] == roi_pair]
-                
-                if not baseline_pair.empty:
-                    baseline_fc = baseline_pair['FC'].iloc[0]
-                    baseline_fc_values.append(baseline_fc)
-                    delta_ybocs_values.append(delta_ybocs)
-                
-                # Get FC change
-                followup_fc_df = fc_data[subject]['ses-followup']
-                followup_pair = followup_fc_df[followup_fc_df['ROI'] == roi_pair]
-                
-                if not baseline_pair.empty and not followup_pair.empty:
-                    baseline_fc = baseline_pair['FC'].iloc[0]
-                    followup_fc = followup_pair['FC'].iloc[0]
-                    delta_fc = followup_fc - baseline_fc
-                    delta_fc_values.append(delta_fc)
+            # Get baseline FC value
+            baseline_fc_df = fc_data[subject]['ses-baseline']
+            baseline_pair = baseline_fc_df[baseline_fc_df['ROI'] == roi_pair]
+            
+            if not baseline_pair.empty:
+                baseline_fc = baseline_pair['FC'].iloc[0]
+                baseline_fc_values.append(baseline_fc)
+                delta_ybocs_values.append(delta_ybocs)
+            
+            # Get FC change
+            followup_fc_df = fc_data[subject]['ses-followup']
+            followup_pair = followup_fc_df[followup_fc_df['ROI'] == roi_pair]
+            
+            if not baseline_pair.empty and not followup_pair.empty:
+                baseline_fc = baseline_pair['FC'].iloc[0]
+                followup_fc = followup_pair['FC'].iloc[0]
+                delta_fc = followup_fc - baseline_fc
+                delta_fc_values.append(delta_fc)
         
         # Baseline FC vs Delta YBOCS
         if len(baseline_fc_values) > 2 and len(delta_ybocs_values) > 2:
@@ -860,7 +862,7 @@ def main():
     
     # Perform longitudinal analysis
     baseline_fc_results, delta_fc_results = run_longitudinal_analysis(
-        fc_data, clinical_df, logger
+        fc_data, metadata_df, clinical_df, logger
     )
     
     # Save results

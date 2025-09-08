@@ -1,4 +1,0 @@
-ROI,network1,network2,FC
-ROI_1_ROI_2,Default,Default,0.7
-ROI_1_ROI_3,Default,Salience,0.5
-ROI_2_ROI_3,Default,Salience,0.6
