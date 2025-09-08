@@ -1,24 +1,12 @@
 #!/usr/bin/env python3
 """
-ROI-to-ROI Functional Connectivity Group Analysis
+ROI-to-ROI Functional Connectivity Group Analysis using Customizable Atlas
 
 This script performs group-level statistical analysis on ROI-to-ROI functional connectivity data.
 It compares healthy controls (HC) vs. OCD patients and performs longitudinal analyses.
 
-IMPORTANT: This script analyzes ROI-TO-ROI connectivity (individual ROI pairs).
-It requires input files with "*_roiroi_fc_avg.csv" naming pattern.
-
-SUITABLE ATLASES:
-- ALL atlases that generate *_roiroi_fc_avg.csv files:
-  * Network-based atlases: Power 2011, Schaefer 2018, YEO 2011
-  * Anatomical atlases: Harvard-Oxford, AAL, Talairach
-  * Custom atlases: Any atlas that generates ROI-to-ROI connectivity files
-
-ANALYSIS TYPE:
-- ROI-to-ROI connectivity analysis (individual ROI pairs)
-- Group comparisons (HC vs OCD)
-- Longitudinal analysis (baseline vs follow-up)
-- Clinical correlation analysis
+The script is compatible with both custom atlases and Nilearn built-in atlases (e.g., Schaefer 2018,
+Harvard-Oxford, Power 2011, etc.) and automatically handles atlas detection and validation.
 
 Author: [Your Name]
 Date: [Current Date]
@@ -26,146 +14,176 @@ Date: [Current Date]
 USAGE EXAMPLES:
 ==============
 
-1. Power 2011 Atlas (Network-based):
+1. Power 2011 Atlas (Default):
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data \\
-     --atlas_name power_2011
-kl
-2. Schaefer 2018 Atlas (Network-based, 400 ROIs, 7 networks):
+     --input_dir /path/to/fc/data
+
+2. Schaefer 2018 Atlas (400 ROIs, 7 networks):
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name schaefer_2018_400_7_2
 
-3. YEO 2011 Atlas (Network-based, 7 networks):
+3. Schaefer 2018 Atlas (1000 ROIs, 17 networks):
+   python NW_group3.py \\
+     --subjects_csv group.csv \\
+     --clinical_csv clinical.csv \\
+     --input_dir /path/to/fc/data \\
+     --atlas_name schaefer_2018_1000_17_1
+
+4. With Specific Atlas Name:
+   python NW_group3.py \\
+     --subjects_csv group.csv \\
+     --clinical_csv clinical.csv \\
+     --input_dir /path/to/fc/data \\
+     --atlas_name power_2011
+
+5. YEO 2011 Atlas (7 networks):
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name yeo_2011_7_thick
 
-4. Harvard-Oxford Atlas (Anatomical):
+6. YEO 2011 Atlas (17 networks):
+   python NW_group3.py \\
+     --subjects_csv group.csv \\
+     --clinical_csv clinical.csv \\
+     --input_dir /path/to/fc/data \\
+     --atlas_name yeo_2011_17_thick
+
+7. Harvard-Oxford Atlas:
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
      --atlas_name harvard_oxford_cort-maxprob-thr25-2mm
 
-5. AAL Atlas (Anatomical):
+8. Auto-detect Atlas from Input Files:
    python NW_group3.py \\
      --subjects_csv group.csv \\
      --clinical_csv clinical.csv \\
      --input_dir /path/to/fc/data \\
-     --atlas_name aal
-
-6. Auto-detect Atlas:
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data
+     --auto-detect-atlas
 
 ATLAS NAMING CONVENTIONS:
 ========================
 
 The script automatically detects atlas names from input FC files:
-- Network-based atlases:
-  * Power 2011: power_2011_roiroi_fc_avg.csv
-  * Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution}_roiroi_fc_avg.csv
-  * YEO 2011: yeo_2011_{n_networks}_{thickness}_roiroi_fc_avg.csv
-- Anatomical atlases:
-  * Harvard-Oxford: harvard_oxford_{atlas_name}_roiroi_fc_avg.csv
-  * AAL: aal_roiroi_fc_avg.csv
-  * Talairach: talairach_roiroi_fc_avg.csv
+- Power 2011: power_2011_roiroi_fc_avg.csv
+- Schaefer 2018: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}_roiroi_fc_avg.csv
+  Examples:
+    - schaefer_2018_400_7_2_roiroi_fc_avg.csv (400 ROIs, 7 networks, 2mm)
+    - schaefer_2018_1000_17_1_roiroi_fc_avg.csv (1000 ROIs, 17 networks, 1mm)
+- YEO 2011: yeo_2011_{n_networks}_{thickness}_roiroi_fc_avg.csv
+  Examples:
+    - yeo_2011_7_thick_roiroi_fc_avg.csv (7 networks, thick parcellation)
+    - yeo_2011_17_thin_roiroi_fc_avg.csv (17 networks, thin parcellation)
+- Harvard-Oxford: harvard_oxford_{atlas_name}_roiroi_fc_avg.csv
+  Examples:
+    - harvard_oxford_cort-maxprob-thr25-2mm_roiroi_fc_avg.csv
+    - harvard_oxford_sub-maxprob-thr25-2mm_roiroi_fc_avg.csv
+- AAL: aal_roiroi_fc_avg.csv
+- Talairach: talairach_roiroi_fc_avg.csv
 - Custom: custom_atlas_roiroi_fc_avg.csv
 
-IMPORTANT: This script (NW_group3.py) analyzes ROI-to-ROI connectivity and requires
-*_roiroi_fc_avg.csv input files. ALL atlases (both network-based and anatomical) 
-generate these files when processed by NW_1st.py.
+Note: For Schaefer 2018, the naming follows the pattern: schaefer_2018_{n_rois}_{yeo_networks}_{resolution_mm}
+where n_rois can be 100, 200, 300, 400, 500, 600, 700, 800, 900, or 1000,
+yeo_networks can be 7 or 17, and resolution_mm can be 1 or 2.
+For YEO 2011, the naming follows: yeo_2011_{n_networks}_{thickness}
+where n_networks can be 7 or 17, and thickness can be 'thick' or 'thin'.
 
 OUTPUT FILES:
 ============
+
 - group_diff_baseline_{atlas_name}_roiroi_fc.csv: Group difference t-test results
+- group_diff_followup_{atlas_name}_roiroi_fc.csv: Group difference t-test results (followup)
 - baselineFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv: Baseline FC vs symptom change
 - deltaFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv: FC change vs symptom change
-- group_diff_followup_{atlas_name}_roiroi_fc.csv: Follow-up group differences
-- summary_{atlas_name}_roiroi_fc.csv: Summary statistics
+- summary_{atlas_name}_roiroi_fc.csv: Analysis summary
 
-DIFFERENCE FROM NW_group.py and NW_group2.py:
----------------------------------------------
-This script (NW_group3.py) analyzes ROI-to-ROI pairwise functional connectivity 
-(individual ROI pairs) and requires *_roiroi_fc_avg.csv input files.
+REQUIREMENTS:
+============
 
-NW_group.py analyzes ROI-to-network connectivity and works with both:
-- *_network_fc_avg.csv files (for network-based atlases)
-- *_roiroi_fc_avg.csv files (for anatomical atlases)
-
-NW_group2.py analyzes network-level connectivity and works with:
-- *_network_fc_avg.csv files (for network-based atlases only)
-
-ATLAS COMPATIBILITY:
--------------------
-- SUITABLE: Harvard-Oxford, AAL, Talairach (anatomical atlases)
-- NOT SUITABLE: Power 2011, Schaefer 2018, YEO 2011 (network-based atlases)
+- FC data files from NW_1st.py with atlas-specific naming
+- group.csv and clinical.csv metadata files
+- BIDS-formatted subject and session information
 """
 
 import os
-import sys
 import glob
 import re
-import json
-import argparse
-import logging
-import warnings
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
-from collections import defaultdict
-
 import numpy as np
 import pandas as pd
 from scipy import stats
-from scipy.stats import ttest_ind, pearsonr
-import matplotlib.pyplot as plt
-import seaborn as sns
+from statsmodels.stats.multitest import fdrcorrection
+from statsmodels.formula.api import ols
+from statsmodels.stats.anova import anova_lm
+import argparse
+import logging
+from pathlib import Path
+from typing import Optional, Tuple, List, Dict, Any
+import warnings
+import sys
 
-# Suppress warnings
+# Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
+# Default configuration
 DEFAULT_CONFIG = {
-    'default_atlas_name': 'auto',  # Auto-detect atlas from available files
-    'sessions': ['baseline', 'followup'],
-    'groups': ['HC', 'OCD'],
-    'min_subjects_per_group': 5,
-    'significance_threshold': 0.05,
-    'fdr_correction': True,
-    'output_dir': './results',
-    'log_file': './logs/roiroi_fc_analysis.log'
+    'output_dir': '/project/6079231/dliang55/R01_AOCD/NW_group',
+    'input_dir': '/project/6079231/dliang55/R01_AOCD',
+    'log_file': 'roiroi_fc_analysis.log',
+    'sessions': ['ses-baseline', 'ses-followup'],
+    'min_subjects_per_group': 2,
+    'fdr_alpha': 0.05,
+    'default_atlas_name': 'power_2011'  # Default atlas name for backward compatibility
 }
 
 # =============================================================================
 # LOGGING SETUP
 # =============================================================================
 
-def setup_logging(log_file: str) -> logging.Logger:
-    """Setup logging configuration."""
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+def setup_logging(output_dir: str, log_filename: str) -> logging.Logger:
+    """Set up logging configuration with both file and console handlers."""
+    log_file = os.path.join(output_dir, log_filename)
+    log_dir = os.path.dirname(log_file)
+    os.makedirs(log_dir, exist_ok=True)
     
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler(sys.stdout)
-        ]
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    logger = logging.getLogger(__name__)
+    # Create logger
+    logger = logging.getLogger('ROI_ROI_Analysis')
+    logger.setLevel(logging.INFO)
+    
+    # Clear existing handlers
+    logger.handlers.clear()
+    
+    # File handler
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(formatter)
+    
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    
+    # Add handlers
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    
     return logger
 
 # =============================================================================
@@ -173,269 +191,126 @@ def setup_logging(log_file: str) -> logging.Logger:
 # =============================================================================
 
 def parse_arguments() -> argparse.Namespace:
-    """Parse command line arguments."""
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description='ROI-to-ROI Functional Connectivity Group Analysis',
+        description='ROI-to-ROI functional connectivity group analysis using customizable atlas',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-QUICK HELP - ROI-to-ROI Functional Connectivity Group Analysis
-=============================================================
+Examples:
+  # Power 2011 Atlas (Default)
+  python NW_group3.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data
 
-BASIC USAGE:
-  python NW_group3.py --subjects_csv <GROUP_CSV> --clinical_csv <CLINICAL_CSV> --input_dir <FC_DATA_DIR>
+  # Schaefer 2018 Atlas (400 ROIs, 7 networks)
+  python NW_group3.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data \\
+    --atlas_name schaefer_2018_400_7_2
 
-QUICK EXAMPLES:
-  1. Default Atlas (Harvard-Oxford):
-     python NW_group3.py \\
-       --subjects_csv group.csv \\
-       --clinical_csv clinical.csv \\
-       --input_dir /path/to/fc/data
+  # Schaefer 2018 Atlas (1000 ROIs, 17 networks)
+  python NW_group3.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data \\
+    --atlas_name schaefer_2018_1000_17_1
 
-  2. Specific Atlas:
-     python NW_group3.py \\
-       --subjects_csv group.csv \\
-       --clinical_csv clinical.csv \\
-       --input_dir /path/to/fc/data \\
-       --atlas_name harvard_oxford_cort-maxprob-thr25-2mm
+  # With Specific Atlas Name
+  python NW_group3.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data \\
+    --atlas_name power_2011
 
-  3. Auto-detect Atlas:
-     python NW_group3.py \\
-       --subjects_csv group.csv \\
-       --clinical_csv clinical.csv \\
-       --input_dir /path/to/fc/data
+  # YEO 2011 Atlas (7 networks)
+  python NW_group3.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data \\
+    --atlas_name yeo_2011_7_thick
 
-HELP OPTIONS:
-  --help          Show this help message
-  --usage         Show detailed usage examples
+  # YEO 2011 Atlas (17 networks)
+  python NW_group3.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data \\
+    --atlas_name yeo_2011_17_thick
+
+  # Harvard-Oxford Atlas
+  python NW_group3.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data \\
+    --atlas_name harvard_oxford_cort-maxprob-thr25-2mm
+
+  # Auto-detect Atlas from Input Files
+  python NW_group3.py \\
+    --subjects_csv group.csv \\
+    --clinical_csv clinical.csv \\
+    --input_dir /path/to/fc/data \\
+    --auto-detect-atlas
+
+Run with --help for full help.
         """
     )
-    
-    parser.add_argument('--subjects_csv', type=str, required=False,
-                       help='CSV file containing subject IDs and group labels')
-    parser.add_argument('--clinical_csv', type=str, required=False,
-                       help='CSV file containing clinical data including YBOCS scores')
-    parser.add_argument('--input_dir', type=str, required=False,
-                       help='Directory containing FC data files')
-    parser.add_argument('--atlas_name', type=str, default=None,
-                       help='Specific atlas name (auto-detected if not provided)')
-    parser.add_argument('--output_dir', type=str, default=DEFAULT_CONFIG['output_dir'],
-                       help=f'Output directory for results (default: {DEFAULT_CONFIG["output_dir"]})')
-    parser.add_argument('--min_subjects', type=int, default=DEFAULT_CONFIG['min_subjects_per_group'],
-                       help=f'Minimum subjects per group (default: {DEFAULT_CONFIG["min_subjects_per_group"]})')
-    parser.add_argument('--significance_threshold', type=float, default=DEFAULT_CONFIG['significance_threshold'],
-                       help=f'Significance threshold (default: {DEFAULT_CONFIG["significance_threshold"]})')
-    parser.add_argument('--no_fdr', action='store_true',
-                       help='Disable FDR correction for multiple comparisons')
-    parser.add_argument('--verbose', action='store_true',
-                       help='Enable verbose logging')
-    parser.add_argument('--usage', action='store_true',
-                       help='Show detailed usage examples')
+    parser.add_argument(
+        '--subjects_csv', 
+        type=str, 
+        required=True, 
+        help='Path to group.csv file'
+    )
+    parser.add_argument(
+        '--clinical_csv', 
+        type=str, 
+        required=True, 
+        help='Path to clinical.csv file'
+    )
+    parser.add_argument(
+        '--output_dir', 
+        type=str, 
+        default=DEFAULT_CONFIG['output_dir'],
+        help='Output directory for results'
+    )
+    parser.add_argument(
+        '--input_dir', 
+        type=str, 
+        default=DEFAULT_CONFIG['input_dir'],
+        help='Input directory for FC data'
+    )
+    parser.add_argument(
+        '--atlas_name',
+        type=str,
+        help='Explicitly specify the atlas name (e.g., power_2011, schaefer_2018_400_7_2, schaefer_2018_1000_17_1)'
+    )
+    parser.add_argument(
+        '--auto-detect-atlas',
+        action='store_true',
+        help='Auto-detect atlas name from available FC files in input directory'
+    )
+    parser.add_argument(
+        '--verbose', '-v', 
+        action='store_true', 
+        help='Enable verbose logging'
+    )
     
     return parser.parse_args()
 
-def print_examples():
-    """Print detailed usage examples."""
-    print("""
-DETAILED USAGE EXAMPLES:
-========================
-
-1. POWER 2011 ATLAS (Network-based)
-   ---------------------------------
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data \\
-     --atlas_name power_2011
-   
-   Expected FC files: *_task-rest_power_2011_roiroi_fc_avg.csv
-
-2. SCHAEFER 2018 ATLAS (Network-based)
-   ------------------------------------
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data \\
-     --atlas_name schaefer_2018_400_7_2
-   
-   Expected FC files: *_task-rest_schaefer_2018_400_7_2_roiroi_fc_avg.csv
-
-3. YEO 2011 ATLAS (Network-based)
-   -------------------------------
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data \\
-     --atlas_name yeo_2011_7_thick
-   
-   Expected FC files: *_task-rest_yeo_2011_7_thick_roiroi_fc_avg.csv
-
-4. HARVARD-OXFORD ATLAS (Anatomical)
-   ----------------------------------
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data \\
-     --atlas_name harvard_oxford_cort-maxprob-thr25-2mm
-   
-   Expected FC files: *_task-rest_harvard_oxford_cort-maxprob-thr25-2mm_roiroi_fc_avg.csv
-
-5. AAL ATLAS (Anatomical)
-   -----------------------
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data \\
-     --atlas_name aal
-   
-   Expected FC files: *_task-rest_aal_roiroi_fc_avg.csv
-
-6. AUTO-DETECT ATLAS
-   -----------------
-   python NW_group3.py \\
-     --subjects_csv group.csv \\
-     --clinical_csv clinical.csv \\
-     --input_dir /path/to/fc/data
-   
-   The script will automatically detect available atlases from the input directory.
-
-REQUIRED FILES:
----------------
-- group.csv: Contains subject IDs and group labels (HC/OCD)
-- clinical.csv: Contains clinical data including YBOCS scores
-- FC data files: Generated by NW_1st.py with naming pattern:
-  *_{session}_task-rest_{atlas_name}_roiroi_fc_avg.csv
-  (Only anatomical atlases generate these files)
-
-OUTPUT FILES:
--------------
-- group_diff_baseline_{atlas_name}_roiroi_fc.csv: Group difference t-test results
-- baselineFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv: Baseline FC vs symptom change
-- deltaFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv: FC change vs symptom change
-- group_diff_followup_{atlas_name}_roiroi_fc.csv: Follow-up group differences
-- summary_{atlas_name}_roiroi_fc.csv: Summary statistics
-
-ATLAS NAMING CONVENTIONS:
--------------------------
-The script automatically detects atlas names from input FC files:
-- Harvard-Oxford: harvard_oxford_{atlas_name}_roiroi_fc_avg.csv
-  Examples:
-    - harvard_oxford_cort-maxprob-thr25-2mm_roiroi_fc_avg.csv
-    - harvard_oxford_sub-maxprob-thr50-2mm_roiroi_fc_avg.csv
-- AAL: aal_roiroi_fc_avg.csv
-- Talairach: talairach_roiroi_fc_avg.csv
-- Custom: custom_atlas_roiroi_fc_avg.csv (if anatomical)
-
-IMPORTANT: This script (NW_group3.py) analyzes ROI-to-ROI connectivity and requires
-*_roiroi_fc_avg.csv input files. Only anatomical atlases generate these files.
-
-DIFFERENCE FROM NW_group.py and NW_group2.py:
----------------------------------------------
-This script (NW_group3.py) analyzes ROI-to-ROI pairwise functional connectivity 
-(individual ROI pairs) and requires *_roiroi_fc_avg.csv input files.
-
-NW_group.py analyzes ROI-to-network connectivity and works with both:
-- *_network_fc_avg.csv files (for network-based atlases)
-- *_roiroi_fc_avg.csv files (for anatomical atlases)
-
-NW_group2.py analyzes network-level connectivity and works with:
-- *_network_fc_avg.csv files (for network-based atlases only)
-
-ATLAS COMPATIBILITY:
--------------------
-- SUITABLE: Harvard-Oxford, AAL, Talairach (anatomical atlases)
-- NOT SUITABLE: Power 2011, Schaefer 2018, YEO 2011 (network-based atlases)
-    """)
-
 # =============================================================================
-# ATLAS DETECTION AND VALIDATION
+# UTILITY FUNCTIONS
 # =============================================================================
-
-def detect_atlas_name(input_dir: str, logger: logging.Logger) -> str:
-    """Auto-detect atlas name from FC files in input directory."""
-    if not os.path.exists(input_dir):
-        logger.warning("Input directory does not exist, using default atlas name: %s", DEFAULT_CONFIG['default_atlas_name'])
-        return DEFAULT_CONFIG['default_atlas_name']
-    
-    # Look for FC files with roiroi pattern (all atlases generate these)
-    fc_patterns = [
-        '*_task-rest_*_roiroi_fc_avg.csv',  # All atlases (network-based and anatomical)
-        '*_task-rest_*_roiroi_matrix_avg.npy'  # Matrix files
-    ]
-    
-    detected_atlases = set()
-    
-    for pattern in fc_patterns:
-        files = glob.glob(os.path.join(input_dir, pattern))
-        for file_path in files:
-            filename = os.path.basename(file_path)
-            # Pattern: sub-XXX_ses-XXX_task-rest_ATLAS_NAME_roiroi_fc_avg.csv
-            # or: sub-XXX_ses-XXX_task-rest_ATLAS_NAME_roiroi_matrix_avg.npy
-            match = re.search(r'_task-rest_(.+?)_(?:roiroi_fc|roiroi_matrix)_avg', filename)
-            if match:
-                atlas_name = match.group(1)
-                detected_atlases.add(atlas_name)
-                logger.debug("Detected atlas name '%s' from file: %s", atlas_name, filename)
-    
-    if not detected_atlases:
-        logger.warning("No FC files found, using default atlas name: %s", DEFAULT_CONFIG['default_atlas_name'])
-        return DEFAULT_CONFIG['default_atlas_name']
-    
-    if len(detected_atlases) == 1:
-        atlas_name = list(detected_atlases)[0]
-        logger.info("Auto-detected atlas: %s", atlas_name)
-        return atlas_name
-    
-    # Multiple atlases detected
-    logger.info("Multiple atlases detected: %s", list(detected_atlases))
-    logger.info("Using first atlas: %s", list(detected_atlases)[0])
-    return list(detected_atlases)[0]
-
-def validate_atlas_files(input_dir: str, atlas_name: str, logger: logging.Logger) -> bool:
-    """Validate that ROI-to-ROI FC files exist for the specified atlas."""
-    if not os.path.exists(input_dir):
-        logger.error("Input directory does not exist: %s", input_dir)
-        return False
-    
-    # Check for ROI-to-ROI FC files with this atlas name
-    fc_pattern = os.path.join(input_dir, f'*_task-rest_{atlas_name}_roiroi_fc_avg.csv')
-    fc_files = glob.glob(fc_pattern)
-    
-    if not fc_files:
-        logger.error("No ROI-to-ROI FC files found for atlas '%s' in directory: %s", atlas_name, input_dir)
-        logger.error("Expected pattern: *_task-rest_%s_roiroi_fc_avg.csv", atlas_name)
-        logger.error("Make sure NW_1st.py has been run to generate ROI-to-ROI connectivity files")
-        return False
-    
-    logger.info("Found %d ROI-to-ROI FC files for atlas '%s': %s", len(fc_files), atlas_name, 
-                [os.path.basename(f) for f in fc_files[:5]])  # Show first 5 files
-    
-    return True
-
-# =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
-
-def get_roiroi_fc_path(subject: str, session: str, input_dir: str, atlas_name: str) -> str:
-    """Get path to ROI-to-ROI FC CSV file."""
-    if not subject.startswith('sub-'):
-        subject = f"sub-{subject}"
-    
-    path = os.path.join(
-        input_dir, 
-        f"{subject}_{session}_task-rest_{atlas_name}_roiroi_fc_avg.csv"
-    )
-    return path
 
 def get_group(subject_id: str, metadata_df: pd.DataFrame) -> Optional[str]:
     """Get group label for a subject."""
     if subject_id.startswith('sub-'):
         subject_id = subject_id.replace('sub-', '')
     
-    group_row = metadata_df[metadata_df['subject_id'] == subject_id]
-    if group_row.empty:
+    group = metadata_df[metadata_df['subject_id'] == subject_id]['group']
+    if group.empty:
         return None
     
-    return group_row.iloc[0]['group']
+    return group.iloc[0]
 
 def get_ybocs_scores(subject_id: str, clinical_df: pd.DataFrame) -> Tuple[Optional[float], Optional[float]]:
     """Get YBOCS scores for baseline and follow-up sessions."""
@@ -446,45 +321,115 @@ def get_ybocs_scores(subject_id: str, clinical_df: pd.DataFrame) -> Tuple[Option
     if subject_data.empty:
         return None, None
     
-    baseline_ybocs = subject_data[subject_data['session'] == 'baseline']['ybocs_total'].values
-    followup_ybocs = subject_data[subject_data['session'] == 'followup']['ybocs_total'].values
+    baseline_score = None
+    followup_score = None
     
-    baseline_score = baseline_ybocs[0] if len(baseline_ybocs) > 0 else None
-    followup_score = followup_ybocs[0] if len(followup_ybocs) > 0 else None
+    for _, row in subject_data.iterrows():
+        if row['session'] == 'baseline':
+            baseline_score = row['ybocs_total']
+        elif row['session'] == 'followup':
+            followup_score = row['ybocs_total']
     
     return baseline_score, followup_score
 
-def load_roiroi_fc_data(fc_dir: str, atlas_name: str, logger: logging.Logger) -> Dict[str, Dict[str, pd.DataFrame]]:
-    """Load ROI-to-ROI FC data for all subjects and sessions."""
-    if not os.path.exists(fc_dir):
-        logger.error("Input directory %s does not exist", fc_dir)
-        raise ValueError(f"Input directory {fc_dir} does not exist")
+# =============================================================================
+# DATA LOADING FUNCTIONS
+# =============================================================================
+
+def load_metadata(subjects_csv: str, clinical_csv: str, logger: logging.Logger
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Load and validate metadata CSVs including condition information."""
+    logger.info("Loading metadata from %s and %s", subjects_csv, clinical_csv)
     
-    # Find FC files with the specific atlas (only roiroi files for anatomical atlases)
-    fc_files = glob.glob(os.path.join(fc_dir, f'*_task-rest_{atlas_name}_roiroi_fc_avg.csv'))
+    try:
+        df = pd.read_csv(subjects_csv)
+        df['subject_id'] = df['sub'].astype(str)
+        df = df[df['group'].isin(['HC', 'OCD'])]
+        logger.info("Loaded %d subjects from %s", len(df), subjects_csv)
+    except Exception as e:
+        logger.error("Failed to load subjects CSV: %s", e)
+        raise ValueError(f"Failed to load subjects CSV: {e}")
+
+    try:
+        df_clinical = pd.read_csv(clinical_csv)
+        df_clinical['subject_id'] = df_clinical['sub'].astype(str)
+        logger.info("Loaded %d clinical records from %s", len(df_clinical), clinical_csv)
+    except Exception as e:
+        logger.error("Failed to load clinical CSV: %s", e)
+        raise ValueError(f"Failed to load clinical CSV: {e}")
+
+    # Load condition information from shared_demographics.csv
+    try:
+        # The subjects_csv IS the shared_demographics.csv file, so condition info is already there
+        if 'condition' in df.columns:
+            # Fill missing conditions with 'unknown' for HC subjects, keep actual values for OCD subjects
+            df.loc[df['group'] == 'HC', 'condition'] = 'unknown'
+            df.loc[df['group'] == 'OCD', 'condition'] = df.loc[df['group'] == 'OCD', 'condition'].fillna('unknown')
+            
+            logger.info("Loaded condition information from subjects CSV")
+        else:
+            logger.warning("No condition column found in subjects CSV")
+    except Exception as e:
+        logger.warning("Failed to load condition information: %s", e)
+
+    return df, df_clinical
+
+def detect_atlas_from_files(input_dir: str, logger: logging.Logger) -> Optional[str]:
+    """Auto-detect atlas name from available FC files."""
+    logger.info("Auto-detecting atlas from files in %s", input_dir)
+    
+    # Look for ROI-to-ROI FC files
+    roi_pattern = os.path.join(input_dir, '*_task-rest_*_roiroi_fc_avg.csv')
+    roi_files = glob.glob(roi_pattern)
+    
+    if not roi_files:
+        logger.error("No ROI-to-ROI FC files found in %s", input_dir)
+        return None
+    
+    # Extract atlas names from filenames
+    atlas_names = set()
+    for file_path in roi_files:
+        filename = os.path.basename(file_path)
+        # Pattern: sub-XXX_ses-XXX_task-rest_ATLAS_roiroi_fc_avg.csv
+        match = re.search(r'_task-rest_(.+?)_roiroi_fc_avg\.csv', filename)
+        if match:
+            atlas_names.add(match.group(1))
+    
+    if len(atlas_names) == 1:
+        atlas_name = list(atlas_names)[0]
+        logger.info("Detected atlas: %s", atlas_name)
+        return atlas_name
+    elif len(atlas_names) > 1:
+        logger.warning("Multiple atlases detected: %s. Using the first one: %s", 
+                      list(atlas_names), list(atlas_names)[0])
+        return list(atlas_names)[0]
+    else:
+        logger.error("Could not detect atlas from files")
+        return None
+
+def validate_atlas_files(input_dir: str, atlas_name: str, logger: logging.Logger) -> bool:
+    """Validate that FC files exist for the specified atlas."""
+    pattern = os.path.join(input_dir, f'*_task-rest_{atlas_name}_roiroi_fc_avg.csv')
+    files = glob.glob(pattern)
+    
+    if not files:
+        logger.error("No FC files found for atlas '%s' in %s", atlas_name, input_dir)
+        return False
+    
+    logger.info("Found %d FC files for atlas '%s'", len(files), atlas_name)
+    return True
+
+def load_roiroi_fc_data(input_dir: str, atlas_name: str, logger: logging.Logger) -> Dict[str, Dict[str, pd.DataFrame]]:
+    """Load ROI-to-ROI FC data for all subjects and sessions."""
+    logger.info("Loading FC data...")
+    
+    # Find FC files with the specific atlas
+    fc_files = glob.glob(os.path.join(input_dir, f'*_task-rest_{atlas_name}_roiroi_fc_avg.csv'))
     logger.info("Found %d FC files for atlas %s", len(fc_files), atlas_name)
     
     if not fc_files:
-        # Try to find any FC files to help with debugging
-        all_fc_patterns = [
-            os.path.join(fc_dir, '*_task-rest_*_roiroi_fc_avg.csv'),
-            os.path.join(fc_dir, '*_task-rest_*_network_fc_avg.csv')
-        ]
-        all_fc_files = []
-        for pattern in all_fc_patterns:
-            all_fc_files.extend(glob.glob(pattern))
-        if all_fc_files:
-            detected_atlases = set()
-            for f in all_fc_files:
-                filename = os.path.basename(f)
-                match = re.search(r'_task-rest_(.+?)_(?:roiroi_fc|network_fc)_avg', filename)
-                if match:
-                    detected_atlases.add(match.group(1))
-            logger.error("No FC files found for atlas '%s'. Available atlases: %s", atlas_name, detected_atlases)
-        else:
-            dir_contents = os.listdir(fc_dir)
-            logger.error("No FC files found in directory. Directory contents: %s", dir_contents[:10])
-        raise ValueError(f"No FC files found for atlas {atlas_name}")
+        logger.error("No FC files found for atlas %s", atlas_name)
+        return {}
     
     subject_sessions = {}
     dropped_subjects = []
@@ -526,52 +471,28 @@ def load_roiroi_fc_data(fc_dir: str, atlas_name: str, logger: logging.Logger) ->
 # STATISTICAL ANALYSIS FUNCTIONS
 # =============================================================================
 
-def perform_group_comparison(fc_data: Dict[str, Dict[str, pd.DataFrame]], 
-                           metadata_df: pd.DataFrame, 
-                           session: str,
-                           atlas_name: str,
-                           logger: logging.Logger) -> pd.DataFrame:
-    """Perform group comparison (HC vs OCD) for ROI-to-ROI connectivity."""
-    logger.info("Performing group comparison for session: %s", session)
-    
-    # Collect data for each group
-    hc_data = []
-    ocd_data = []
-    
-    for subject, sessions_data in fc_data.items():
-        if session not in sessions_data:
-            continue
-        
-        group = get_group(subject, metadata_df)
-        if group is None:
-            logger.warning("No group found for subject %s", subject)
-            continue
-        
-        fc_df = sessions_data[session]
-        
-        if group == 'HC':
-            hc_data.append(fc_df)
-        elif group == 'OCD':
-            ocd_data.append(fc_df)
-    
-    logger.info("Group sizes - HC: %d, OCD: %d", len(hc_data), len(ocd_data))
-    
-    if len(hc_data) < DEFAULT_CONFIG['min_subjects_per_group'] or len(ocd_data) < DEFAULT_CONFIG['min_subjects_per_group']:
-        logger.warning("Insufficient subjects per group (min: %d)", DEFAULT_CONFIG['min_subjects_per_group'])
-        logger.info("Returning empty results due to insufficient subjects")
-        return pd.DataFrame()
-    
-    # Perform t-tests for each ROI pair
-    results = []
+def run_ttest(
+    fc_data_hc: List[pd.DataFrame], 
+    fc_data_ocd: List[pd.DataFrame], 
+    logger: logging.Logger
+) -> pd.DataFrame:
+    """Run two-sample t-tests with FDR correction for ROI-to-ROI FC."""
+    logger.info(
+        "Running t-tests with %d HC subjects and %d OCD subjects",
+        len(fc_data_hc), len(fc_data_ocd)
+    )
     
     # Get all ROI pairs from the first subject
-    if hc_data:
-        roi_pairs = hc_data[0][['ROI1', 'ROI2']].copy()
-    elif ocd_data:
-        roi_pairs = ocd_data[0][['ROI1', 'ROI2']].copy()
+    if fc_data_hc:
+        roi_pairs = fc_data_hc[0][['ROI1', 'ROI2']].copy()
+    elif fc_data_ocd:
+        roi_pairs = fc_data_ocd[0][['ROI1', 'ROI2']].copy()
     else:
         logger.error("No data available for analysis")
         return pd.DataFrame()
+    
+    results = []
+    dropped_features = []
     
     for _, row in roi_pairs.iterrows():
         roi1, roi2 = row['ROI1'], row['ROI2']
@@ -584,7 +505,7 @@ def perform_group_comparison(fc_data: Dict[str, Dict[str, pd.DataFrame]],
         hc_values = []
         ocd_values = []
         
-        for fc_df in hc_data:
+        for fc_df in fc_data_hc:
             pair_data = fc_df[(fc_df['ROI1'] == roi1) & (fc_df['ROI2'] == roi2)]
             if not pair_data.empty:
                 hc_values.append(pair_data['fc_value'].iloc[0])
@@ -594,7 +515,7 @@ def perform_group_comparison(fc_data: Dict[str, Dict[str, pd.DataFrame]],
                 if network2 == 'Unknown' and 'network2' in pair_data.columns:
                     network2 = pair_data['network2'].iloc[0]
         
-        for fc_df in ocd_data:
+        for fc_df in fc_data_ocd:
             pair_data = fc_df[(fc_df['ROI1'] == roi1) & (fc_df['ROI2'] == roi2)]
             if not pair_data.empty:
                 ocd_values.append(pair_data['fc_value'].iloc[0])
@@ -604,71 +525,89 @@ def perform_group_comparison(fc_data: Dict[str, Dict[str, pd.DataFrame]],
                 if network2 == 'Unknown' and 'network2' in pair_data.columns:
                     network2 = pair_data['network2'].iloc[0]
         
-        if len(hc_values) > 0 and len(ocd_values) > 0:
-            # Perform t-test
-            t_stat, p_value = ttest_ind(hc_values, ocd_values)
-            
-            # Calculate effect size (Cohen's d)
-            pooled_std = np.sqrt(((len(hc_values) - 1) * np.var(hc_values, ddof=1) + 
-                                 (len(ocd_values) - 1) * np.var(ocd_values, ddof=1)) / 
-                                (len(hc_values) + len(ocd_values) - 2))
-            cohens_d = (np.mean(hc_values) - np.mean(ocd_values)) / pooled_std if pooled_std > 0 else 0
-            
-            results.append({
-                'ROI1': roi1,
-                'ROI2': roi2,
-                'network1': network1,
-                'network2': network2,
-                'HC_mean': np.mean(hc_values),
-                'OCD_mean': np.mean(ocd_values),
-                'HC_std': np.std(hc_values, ddof=1),
-                'OCD_std': np.std(ocd_values, ddof=1),
-                't_statistic': t_stat,
-                'p_value': p_value,
-                'cohens_d': cohens_d,
-                'HC_n': len(hc_values),
-                'OCD_n': len(ocd_values)
-            })
+        if len(hc_values) < DEFAULT_CONFIG['min_subjects_per_group'] or \
+           len(ocd_values) < DEFAULT_CONFIG['min_subjects_per_group']:
+            logger.warning(
+                "Skipping ROI pair %s-%s due to insufficient data (HC n=%d, OCD n=%d)",
+                roi1, roi2, len(hc_values), len(ocd_values)
+            )
+            dropped_features.append((f"{roi1}-{roi2}", f"HC n={len(hc_values)}, OCD n={len(ocd_values)}"))
+            continue
+        
+        # Perform t-test
+        t_stat, p_value = stats.ttest_ind(hc_values, ocd_values)
+        
+        # Calculate effect size (Cohen's d)
+        pooled_std = np.sqrt(((len(hc_values) - 1) * np.var(hc_values, ddof=1) + 
+                             (len(ocd_values) - 1) * np.var(ocd_values, ddof=1)) / 
+                            (len(hc_values) + len(ocd_values) - 2))
+        cohens_d = (np.mean(hc_values) - np.mean(ocd_values)) / pooled_std if pooled_std > 0 else 0
+        
+        results.append({
+            'ROI1': roi1,
+            'ROI2': roi2,
+            'network1': network1,
+            'network2': network2,
+            'HC_mean': np.mean(hc_values),
+            'OCD_mean': np.mean(ocd_values),
+            'HC_std': np.std(hc_values, ddof=1),
+            'OCD_std': np.std(ocd_values, ddof=1),
+            't_statistic': t_stat,
+            'p_value': p_value,
+            'cohens_d': cohens_d,
+            'HC_n': len(hc_values),
+            'OCD_n': len(ocd_values)
+        })
+    
+    if not results:
+        logger.warning("No valid ROI pairs for t-test analysis")
+        return pd.DataFrame()
     
     results_df = pd.DataFrame(results)
     
-    if not results_df.empty and DEFAULT_CONFIG['fdr_correction']:
-        from statsmodels.stats.multitest import multipletests
-        _, p_corrected, _, _ = multipletests(results_df['p_value'], method='fdr_bh')
-        results_df['p_corrected'] = p_corrected
-        results_df['significant'] = p_corrected < DEFAULT_CONFIG['significance_threshold']
+    # Apply FDR correction
+    if len(results_df) > 1:
+        p_vals = results_df['p_value'].values
+        _, p_vals_corr = fdrcorrection(p_vals, alpha=DEFAULT_CONFIG['fdr_alpha'])
+        results_df['p_corrected'] = p_vals_corr
+        results_df['significant'] = p_vals_corr < DEFAULT_CONFIG['fdr_alpha']
     else:
         results_df['p_corrected'] = results_df['p_value']
-        results_df['significant'] = results_df['p_value'] < DEFAULT_CONFIG['significance_threshold']
+        results_df['significant'] = results_df['p_value'] < DEFAULT_CONFIG['fdr_alpha']
     
-    logger.info("Found %d significant ROI pairs (p < %.3f)", 
-                results_df['significant'].sum(), DEFAULT_CONFIG['significance_threshold'])
+    logger.info(
+        "Generated t-test results for %d ROI pairs with %d HC and %d OCD subjects",
+        len(results_df), len(fc_data_hc), len(fc_data_ocd)
+    )
+    
+    if dropped_features:
+        logger.warning("Dropped %d ROI pairs due to insufficient data", len(dropped_features))
     
     return results_df
 
-def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]], 
-                                clinical_df: pd.DataFrame,
-                                atlas_name: str,
-                                logger: logging.Logger) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Perform longitudinal analysis (baseline FC vs symptom change, FC change vs symptom change)."""
+def run_longitudinal_analysis(
+    fc_data: Dict[str, Dict[str, pd.DataFrame]], 
+    clinical_df: pd.DataFrame, 
+    logger: logging.Logger
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Run longitudinal analysis for ROI-to-ROI FC."""
     logger.info("Performing longitudinal analysis")
     
-    # Collect data for subjects with both sessions
+    # Find subjects with both baseline and follow-up data
     subjects_with_both_sessions = []
     for subject, sessions_data in fc_data.items():
-        if 'baseline' in sessions_data and 'followup' in sessions_data:
+        if 'ses-baseline' in sessions_data and 'ses-followup' in sessions_data:
             subjects_with_both_sessions.append(subject)
     
     logger.info("Found %d subjects with both baseline and follow-up data", len(subjects_with_both_sessions))
     
     if len(subjects_with_both_sessions) < DEFAULT_CONFIG['min_subjects_per_group']:
         logger.warning("Insufficient subjects for longitudinal analysis")
-        logger.info("Returning empty results due to insufficient subjects")
         return pd.DataFrame(), pd.DataFrame()
     
     # Get all ROI pairs from the first subject
     first_subject = subjects_with_both_sessions[0]
-    roi_pairs = fc_data[first_subject]['baseline'][['ROI1', 'ROI2']].copy()
+    roi_pairs = fc_data[first_subject]['ses-baseline'][['ROI1', 'ROI2']].copy()
     
     baseline_fc_results = []
     delta_fc_results = []
@@ -691,7 +630,7 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
                 delta_ybocs = followup_score - baseline_score
                 
                 # Get baseline FC value
-                baseline_fc_df = fc_data[subject]['baseline']
+                baseline_fc_df = fc_data[subject]['ses-baseline']
                 baseline_pair = baseline_fc_df[(baseline_fc_df['ROI1'] == roi1) & (baseline_fc_df['ROI2'] == roi2)]
                 
                 if not baseline_pair.empty:
@@ -705,7 +644,7 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
                         network2 = baseline_pair['network2'].iloc[0]
                 
                 # Get FC change
-                followup_fc_df = fc_data[subject]['followup']
+                followup_fc_df = fc_data[subject]['ses-followup']
                 followup_pair = followup_fc_df[(followup_fc_df['ROI1'] == roi1) & (followup_fc_df['ROI2'] == roi2)]
                 
                 if not baseline_pair.empty and not followup_pair.empty:
@@ -716,7 +655,7 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
         
         # Baseline FC vs Delta YBOCS
         if len(baseline_fc_values) > 2 and len(delta_ybocs_values) > 2:
-            r, p = pearsonr(baseline_fc_values, delta_ybocs_values)
+            r, p = stats.pearsonr(baseline_fc_values, delta_ybocs_values)
             baseline_fc_results.append({
                 'ROI1': roi1,
                 'ROI2': roi2,
@@ -729,7 +668,7 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
         
         # Delta FC vs Delta YBOCS
         if len(delta_fc_values) > 2 and len(delta_ybocs_values) > 2:
-            r, p = pearsonr(delta_fc_values, delta_ybocs_values)
+            r, p = stats.pearsonr(delta_fc_values, delta_ybocs_values)
             delta_fc_results.append({
                 'ROI1': roi1,
                 'ROI2': roi2,
@@ -744,35 +683,158 @@ def perform_longitudinal_analysis(fc_data: Dict[str, Dict[str, pd.DataFrame]],
     delta_df = pd.DataFrame(delta_fc_results)
     
     # Apply FDR correction
-    if not baseline_df.empty and DEFAULT_CONFIG['fdr_correction']:
-        from statsmodels.stats.multitest import multipletests
-        _, p_corrected, _, _ = multipletests(baseline_df['p_value'], method='fdr_bh')
-        baseline_df['p_corrected'] = p_corrected
-        baseline_df['significant'] = p_corrected < DEFAULT_CONFIG['significance_threshold']
-    elif not baseline_df.empty:
+    if len(baseline_df) > 1:
+        _, p_vals_corr = fdrcorrection(baseline_df['p_value'].values, alpha=DEFAULT_CONFIG['fdr_alpha'])
+        baseline_df['p_corrected'] = p_vals_corr
+        baseline_df['significant'] = p_vals_corr < DEFAULT_CONFIG['fdr_alpha']
+    elif len(baseline_df) == 1:
         baseline_df['p_corrected'] = baseline_df['p_value']
-        baseline_df['significant'] = baseline_df['p_value'] < DEFAULT_CONFIG['significance_threshold']
+        baseline_df['significant'] = baseline_df['p_value'] < DEFAULT_CONFIG['fdr_alpha']
     
-    if not delta_df.empty and DEFAULT_CONFIG['fdr_correction']:
-        from statsmodels.stats.multitest import multipletests
-        _, p_corrected, _, _ = multipletests(delta_df['p_value'], method='fdr_bh')
-        delta_df['p_corrected'] = p_corrected
-        delta_df['significant'] = p_corrected < DEFAULT_CONFIG['significance_threshold']
-    elif not delta_df.empty:
+    if len(delta_df) > 1:
+        _, p_vals_corr = fdrcorrection(delta_df['p_value'].values, alpha=DEFAULT_CONFIG['fdr_alpha'])
+        delta_df['p_corrected'] = p_vals_corr
+        delta_df['significant'] = p_vals_corr < DEFAULT_CONFIG['fdr_alpha']
+    elif len(delta_df) == 1:
         delta_df['p_corrected'] = delta_df['p_value']
-        delta_df['significant'] = delta_df['p_value'] < DEFAULT_CONFIG['significance_threshold']
+        delta_df['significant'] = delta_df['p_value'] < DEFAULT_CONFIG['fdr_alpha']
     
-    logger.info("Longitudinal analysis complete - Baseline FC: %d pairs, Delta FC: %d pairs", 
+    logger.info("Longitudinal analysis complete: %d baseline FC correlations, %d delta FC correlations", 
                 len(baseline_df), len(delta_df))
     
     return baseline_df, delta_df
 
 # =============================================================================
-# MAIN ANALYSIS FUNCTION
+# MAIN ANALYSIS FUNCTIONS
 # =============================================================================
 
-def run_analysis(args: argparse.Namespace, logger: logging.Logger) -> None:
-    """Run the complete ROI-to-ROI FC analysis."""
+def perform_group_difference_analysis(
+    fc_data: Dict[str, Dict[str, pd.DataFrame]], 
+    metadata_df: pd.DataFrame, 
+    atlas_name: str, 
+    logger: logging.Logger
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Perform group difference analysis at baseline and follow-up."""
+    logger.info("Performing group difference analysis for atlas: %s", atlas_name)
+    
+    # Separate HC and OCD data for baseline
+    hc_baseline_data = []
+    ocd_baseline_data = []
+    
+    for subject, sessions_data in fc_data.items():
+        if 'ses-baseline' not in sessions_data:
+            continue
+        
+        group = get_group(subject, metadata_df)
+        if group == 'HC':
+            hc_baseline_data.append(sessions_data['ses-baseline'])
+        elif group == 'OCD':
+            ocd_baseline_data.append(sessions_data['ses-baseline'])
+    
+    logger.info("Baseline group t-test analysis: %d HC subjects, %d OCD subjects", 
+                len(hc_baseline_data), len(ocd_baseline_data))
+    
+    baseline_results = pd.DataFrame()
+    if hc_baseline_data and ocd_baseline_data:
+        baseline_results = run_ttest(hc_baseline_data, ocd_baseline_data, logger)
+    
+    # Separate HC and OCD data for follow-up
+    hc_followup_data = []
+    ocd_followup_data = []
+    
+    for subject, sessions_data in fc_data.items():
+        if 'ses-followup' not in sessions_data:
+            continue
+        
+        group = get_group(subject, metadata_df)
+        if group == 'HC':
+            hc_followup_data.append(sessions_data['ses-followup'])
+        elif group == 'OCD':
+            ocd_followup_data.append(sessions_data['ses-followup'])
+    
+    logger.info("Follow-up group t-test analysis: %d HC subjects, %d OCD subjects", 
+                len(hc_followup_data), len(ocd_followup_data))
+    
+    followup_results = pd.DataFrame()
+    if hc_followup_data and ocd_followup_data:
+        followup_results = run_ttest(hc_followup_data, ocd_followup_data, logger)
+    
+    return baseline_results, followup_results
+
+def save_results(
+    baseline_results: pd.DataFrame, 
+    followup_results: pd.DataFrame, 
+    baseline_fc_results: pd.DataFrame, 
+    delta_fc_results: pd.DataFrame, 
+    atlas_name: str, 
+    output_dir: str, 
+    logger: logging.Logger
+) -> None:
+    """Save all results to CSV files."""
+    logger.info("Saving results...")
+    
+    # Save baseline group comparison results
+    if not baseline_results.empty:
+        baseline_file = os.path.join(output_dir, f'group_diff_baseline_{atlas_name}_roiroi_fc.csv')
+        baseline_results.to_csv(baseline_file, index=False)
+        logger.info("Saved baseline group comparison results: %s", baseline_file)
+    else:
+        logger.info("No baseline group comparison results to save")
+    
+    # Save follow-up group comparison results
+    if not followup_results.empty:
+        followup_file = os.path.join(output_dir, f'group_diff_followup_{atlas_name}_roiroi_fc.csv')
+        followup_results.to_csv(followup_file, index=False)
+        logger.info("Saved follow-up group comparison results: %s", followup_file)
+    else:
+        logger.info("No follow-up group comparison results to save")
+    
+    # Save baseline FC vs delta YBOCS results
+    if not baseline_fc_results.empty:
+        baseline_fc_file = os.path.join(output_dir, f'baselineFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
+        baseline_fc_results.to_csv(baseline_fc_file, index=False)
+        logger.info("Saved baseline FC vs delta YBOCS results: %s", baseline_fc_file)
+    else:
+        logger.info("No baseline FC vs delta YBOCS results to save")
+    
+    # Save delta FC vs delta YBOCS results
+    if not delta_fc_results.empty:
+        delta_fc_file = os.path.join(output_dir, f'deltaFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
+        delta_fc_results.to_csv(delta_fc_file, index=False)
+        logger.info("Saved delta FC vs delta YBOCS results: %s", delta_fc_file)
+    else:
+        logger.info("No delta FC vs delta YBOCS results to save")
+    
+    # Create summary
+    summary_data = {
+        'Analysis': ['Baseline Group Comparison', 'Follow-up Group Comparison', 
+                    'Baseline FC vs Delta YBOCS', 'Delta FC vs Delta YBOCS'],
+        'ROI_Pairs': [len(baseline_results), len(followup_results), 
+                     len(baseline_fc_results), len(delta_fc_results)],
+        'Significant_Pairs': [
+            baseline_results['significant'].sum() if not baseline_results.empty else 0,
+            followup_results['significant'].sum() if not followup_results.empty else 0,
+            baseline_fc_results['significant'].sum() if not baseline_fc_results.empty else 0,
+            delta_fc_results['significant'].sum() if not delta_fc_results.empty else 0
+        ]
+    }
+    
+    summary_df = pd.DataFrame(summary_data)
+    summary_file = os.path.join(output_dir, f'summary_{atlas_name}_roiroi_fc.csv')
+    summary_df.to_csv(summary_file, index=False)
+    logger.info("Saved summary: %s", summary_file)
+
+# =============================================================================
+# MAIN FUNCTION
+# =============================================================================
+
+def main():
+    """Main function."""
+    args = parse_arguments()
+    
+    # Set up logging
+    logger = setup_logging(args.output_dir, DEFAULT_CONFIG['log_file'])
+    
     logger.info("=" * 80)
     logger.info("Starting ROI-to-ROI Functional Connectivity Group Analysis")
     logger.info("=" * 80)
@@ -783,147 +845,56 @@ def run_analysis(args: argparse.Namespace, logger: logging.Logger) -> None:
     # Load metadata
     logger.info("Loading metadata files...")
     try:
-        metadata_df = pd.read_csv(args.subjects_csv)
-        clinical_df = pd.read_csv(args.clinical_csv)
-        logger.info("Loaded metadata: %d subjects, %d clinical records", 
-                   len(metadata_df), len(clinical_df))
+        metadata_df, clinical_df = load_metadata(args.subjects_csv, args.clinical_csv, logger)
     except Exception as e:
-        logger.error("Failed to load metadata files: %s", str(e))
+        logger.error("Failed to load metadata: %s", e)
         return
     
     # Detect or validate atlas
     if args.atlas_name:
         atlas_name = args.atlas_name
         if not validate_atlas_files(args.input_dir, atlas_name, logger):
+            logger.error("Atlas validation failed")
+            return
+    elif args.auto_detect_atlas:
+        atlas_name = detect_atlas_from_files(args.input_dir, logger)
+        if not atlas_name:
+            logger.error("Atlas auto-detection failed")
             return
     else:
-        atlas_name = detect_atlas_name(args.input_dir, logger)
+        atlas_name = DEFAULT_CONFIG['default_atlas_name']
         if not validate_atlas_files(args.input_dir, atlas_name, logger):
+            logger.error("Default atlas validation failed")
             return
     
     logger.info("Using atlas: %s", atlas_name)
     
-    # Update log file name to include atlas name
-    atlas_log_file = os.path.join(args.output_dir, f'roiroi_fc_analysis_{atlas_name}.log')
-    logger.info("Switching to atlas-specific log file: %s", atlas_log_file)
-    
-    # Create new logger with atlas-specific log file
-    atlas_logger = setup_logging(atlas_log_file)
-    if args.verbose:
-        atlas_logger.setLevel(logging.DEBUG)
-    
     # Load FC data
-    atlas_logger.info("Loading FC data...")
-    try:
-        fc_data = load_roiroi_fc_data(args.input_dir, atlas_name, atlas_logger)
-    except Exception as e:
-        atlas_logger.error("Failed to load FC data: %s", str(e))
+    fc_data = load_roiroi_fc_data(args.input_dir, atlas_name, logger)
+    if not fc_data:
+        logger.error("Failed to load FC data")
         return
     
-    # Perform group comparisons
-    atlas_logger.info("Performing group comparisons...")
-    baseline_results = perform_group_comparison(fc_data, metadata_df, 'baseline', atlas_name, atlas_logger)
-    followup_results = perform_group_comparison(fc_data, metadata_df, 'followup', atlas_name, atlas_logger)
+    # Perform group difference analysis
+    baseline_results, followup_results = perform_group_difference_analysis(
+        fc_data, metadata_df, atlas_name, logger
+    )
     
     # Perform longitudinal analysis
-    atlas_logger.info("Performing longitudinal analysis...")
-    baseline_fc_long, delta_fc_long = perform_longitudinal_analysis(fc_data, clinical_df, atlas_name, atlas_logger)
+    baseline_fc_results, delta_fc_results = run_longitudinal_analysis(
+        fc_data, clinical_df, logger
+    )
     
-    # Save results (always save, regardless of significance)
-    atlas_logger.info("Saving results...")
+    # Save results
+    save_results(
+        baseline_results, followup_results, 
+        baseline_fc_results, delta_fc_results, 
+        atlas_name, args.output_dir, logger
+    )
     
-    # Save baseline group comparison results
-    if not baseline_results.empty:
-        baseline_file = os.path.join(args.output_dir, f'group_diff_baseline_{atlas_name}_roiroi_fc.csv')
-        baseline_results.to_csv(baseline_file, index=False)
-        atlas_logger.info("Saved baseline group comparison: %s", baseline_file)
-    else:
-        atlas_logger.info("No baseline group comparison results to save")
-    
-    # Save follow-up group comparison results
-    if not followup_results.empty:
-        followup_file = os.path.join(args.output_dir, f'group_diff_followup_{atlas_name}_roiroi_fc.csv')
-        followup_results.to_csv(followup_file, index=False)
-        atlas_logger.info("Saved follow-up group comparison: %s", followup_file)
-    else:
-        atlas_logger.info("No follow-up group comparison results to save")
-    
-    # Save baseline FC vs delta YBOCS results
-    if not baseline_fc_long.empty:
-        baseline_long_file = os.path.join(args.output_dir, f'baselineFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
-        baseline_fc_long.to_csv(baseline_long_file, index=False)
-        atlas_logger.info("Saved baseline FC vs delta YBOCS: %s", baseline_long_file)
-    else:
-        atlas_logger.info("No baseline FC vs delta YBOCS results to save")
-    
-    # Save delta FC vs delta YBOCS results
-    if not delta_fc_long.empty:
-        delta_long_file = os.path.join(args.output_dir, f'deltaFC_vs_deltaYBOCS_{atlas_name}_roiroi_fc.csv')
-        delta_fc_long.to_csv(delta_long_file, index=False)
-        atlas_logger.info("Saved delta FC vs delta YBOCS: %s", delta_long_file)
-    else:
-        atlas_logger.info("No delta FC vs delta YBOCS results to save")
-    
-    # Create summary
-    summary_data = {
-        'atlas_name': [atlas_name],
-        'total_subjects': [len(fc_data)],
-        'baseline_significant_pairs': [baseline_results['significant'].sum() if not baseline_results.empty else 0],
-        'followup_significant_pairs': [followup_results['significant'].sum() if not followup_results.empty else 0],
-        'baseline_fc_significant_pairs': [baseline_fc_long['significant'].sum() if not baseline_fc_long.empty else 0],
-        'delta_fc_significant_pairs': [delta_fc_long['significant'].sum() if not delta_fc_long.empty else 0],
-        'significance_threshold': [DEFAULT_CONFIG['significance_threshold']],
-        'fdr_correction': [DEFAULT_CONFIG['fdr_correction']]
-    }
-    
-    summary_df = pd.DataFrame(summary_data)
-    summary_file = os.path.join(args.output_dir, f'summary_{atlas_name}_roiroi_fc.csv')
-    summary_df.to_csv(summary_file, index=False)
-    atlas_logger.info("Saved summary: %s", summary_file)
-    
-    atlas_logger.info("=" * 80)
-    atlas_logger.info("Analysis complete!")
-    atlas_logger.info("=" * 80)
+    logger.info("=" * 80)
+    logger.info("Analysis complete!")
+    logger.info("=" * 80)
 
-# =============================================================================
-# MAIN EXECUTION
-# =============================================================================
-
-def main():
-    """Main function."""
-    args = parse_arguments()
-    
-    if args.usage:
-        print_examples()
-        return
-    
-    # Validate required arguments
-    if not args.subjects_csv or not args.clinical_csv or not args.input_dir:
-        print("Error: --subjects_csv, --clinical_csv, and --input_dir are required")
-        print("Use --usage for detailed examples")
-        sys.exit(1)
-    
-    # Setup logging (will be updated with atlas name after detection)
-    logger = setup_logging(args.output_dir + '/roiroi_fc_analysis.log')
-    if args.verbose:
-        logger.setLevel(logging.DEBUG)
-    
-    # Update configuration
-    if args.no_fdr:
-        DEFAULT_CONFIG['fdr_correction'] = False
-    if args.significance_threshold != DEFAULT_CONFIG['significance_threshold']:
-        DEFAULT_CONFIG['significance_threshold'] = args.significance_threshold
-    if args.min_subjects != DEFAULT_CONFIG['min_subjects_per_group']:
-        DEFAULT_CONFIG['min_subjects_per_group'] = args.min_subjects
-    
-    # Run analysis
-    try:
-        run_analysis(args, logger)
-    except Exception as e:
-        logger.error("Analysis failed: %s", str(e))
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
