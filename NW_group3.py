@@ -958,11 +958,21 @@ def load_roiroi_fc_data(
             fc_data.append(fc_pivot)
             valid_subjects.append(sid)
             
-            # Log progress every 10 subjects
-            if len(valid_subjects) % 10 == 0:
+            # Log progress every 5 subjects and concatenate in batches
+            if len(valid_subjects) % 5 == 0:
                 logger.info("Processed %d/%d subjects", len(valid_subjects), len(subject_ids))
-                # Memory monitoring disabled
-                gc.collect()  # Force garbage collection
+                
+                # Concatenate in batches to prevent memory accumulation
+                if len(fc_data) >= 5:
+                    logger.info("Concatenating batch of %d DataFrames", len(fc_data))
+                    try:
+                        batch_df = pd.concat(fc_data, ignore_index=True)
+                        fc_data = [batch_df]  # Replace list with single concatenated DataFrame
+                        logger.info("Batch concatenated successfully")
+                        gc.collect()  # Force garbage collection
+                    except Exception as e:
+                        logger.error("Failed to concatenate batch: %s", e)
+                        raise
             
         except Exception as e:
             logger.error(
