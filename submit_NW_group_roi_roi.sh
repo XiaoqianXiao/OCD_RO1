@@ -35,7 +35,7 @@ ATLAS_PARAMS=${2:-'{}'}  # Default to empty JSON if not provided
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=32G
+#SBATCH --mem=128G
 #SBATCH --account=def-jfeusner
 
 # Load Apptainer module
