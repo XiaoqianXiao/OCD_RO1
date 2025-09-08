@@ -912,7 +912,7 @@ def load_roiroi_fc_data(
             
             # Create feature identifier and map networks (same as NW_group3.py)
             fc_df['feature_id'] = fc_df['ROI']
-                        if feature_info is None:
+            if feature_info is None:
                 feature_info = {}
                 for _, row in fc_df.iterrows():
                     roi_pair = row['ROI']
