@@ -948,8 +948,10 @@ def load_roiroi_fc_data(
                 feature_info = {}
                 for _, row in fc_df.iterrows():
                     roi_pair = row['ROI']
-                    # For ROI-to-ROI, we don't have network info, so use Unknown
-                    feature_info[roi_pair] = ('Unknown', 'Unknown')
+                    # Use actual network information from the data
+                    network1 = row.get('network1', 'Unknown')
+                    network2 = row.get('network2', 'Unknown')
+                    feature_info[roi_pair] = (network1, network2)
                 logger.debug(
                     "Identified %d ROI-to-ROI feature columns with network mappings", 
                     len(feature_info)
