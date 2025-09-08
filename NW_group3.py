@@ -421,7 +421,7 @@ def get_group(subject_id: str, metadata_df: pd.DataFrame) -> Optional[str]:
 def run_ttest(
     fc_data_hc: pd.DataFrame, 
     fc_data_ocd: pd.DataFrame, 
-    feature_info: Dict[str, Tuple[str, str]],
+    feature_info: Dict[str, Tuple[str, str, str, str]],
     logger: logging.Logger
 ) -> pd.DataFrame:
     """Run two-sample t-tests with FDR correction for ROI-to-ROI FC."""
@@ -433,7 +433,7 @@ def run_ttest(
     results = []
     dropped_features = []
     
-    for feature, (net1, net2) in feature_info.items():
+    for feature, (roi1, roi2, net1, net2) in feature_info.items():
         hc_values = fc_data_hc[feature].dropna()
         ocd_values = fc_data_ocd[feature].dropna()
         
@@ -456,6 +456,8 @@ def run_ttest(
         
         results.append({
             'ROI': feature,
+            'ROI1': roi1,
+            'ROI2': roi2,
             'network1': net1,
             'network2': net2,
             't_statistic': t_stat,
@@ -496,7 +498,7 @@ def run_ttest(
 def run_regression(
     fc_data: pd.DataFrame, 
     y_values: pd.Series, 
-    feature_info: Dict[str, Tuple[str, str]], 
+    feature_info: Dict[str, Tuple[str, str, str, str]], 
     analysis_name: str,
     metadata_df: pd.DataFrame,
     logger: logging.Logger
@@ -555,7 +557,7 @@ def run_regression(
         )
 
     # Run regression for each feature
-    for feature, (net1, net2) in feature_info.items():
+    for feature, (roi1, roi2, net1, net2) in feature_info.items():
         x = fc_data[feature].dropna()
         if x.empty:
             logger.warning(
@@ -629,6 +631,8 @@ def run_regression(
             
             results.append({
                 'ROI': feature,
+                'ROI1': roi1,
+                'ROI2': roi2,
                 'network1': net1,
                 'network2': net2,
                 'fc_effect': fc_effect,  # Effect of FC on outcome
@@ -867,7 +871,7 @@ def validate_subjects(
 
 def validate_roiroi_fc_file(fc_path: str, logger: logging.Logger) -> bool:
     """Validate that ROI-to-ROI FC file has required columns."""
-    required_columns = {'ROI', 'FC'}
+    required_columns = {'ROI_1', 'ROI_2', 'FC'}
     
     try:
         df = pd.read_csv(fc_path)
@@ -926,16 +930,18 @@ def load_roiroi_fc_data(
             logger.debug("Loaded ROI-to-ROI FC file %s with %d rows", fc_path, len(fc_df))
             log_dataframe_info(logger, fc_df, f"raw_data_{sid}")
             
-            # Create feature identifier and map networks (same as NW_group3.py)
-            fc_df['feature_id'] = fc_df['ROI']
+            # Create feature identifier and map networks with ROI1 and ROI2
+            fc_df['feature_id'] = fc_df['ROI_1'] + '_' + fc_df['ROI_2']
             if feature_info is None:
                 feature_info = {}
                 for _, row in fc_df.iterrows():
-                    roi_pair = row['ROI']
+                    roi_pair = row['ROI_1'] + '_' + row['ROI_2']
+                    roi1_name = row['ROI_1']
+                    roi2_name = row['ROI_2']
                     # Use actual network information from the data
                     network1 = row.get('network1', 'Unknown')
                     network2 = row.get('network2', 'Unknown')
-                    feature_info[roi_pair] = (network1, network2)
+                    feature_info[roi_pair] = (roi1_name, roi2_name, network1, network2)
                 logger.debug(
                     "Identified %d ROI-to-ROI feature columns with network mappings", 
                     len(feature_info)
@@ -1019,7 +1025,7 @@ def load_roiroi_fc_data(
 def perform_condition_analysis(
     baseline_fc_data: pd.DataFrame,
     metadata_df: pd.DataFrame,
-    feature_info: Dict[str, Tuple[str, str]],
+    feature_info: Dict[str, Tuple[str, str, str, str]],
     input_dir: str,
     output_dir: str,
     atlas_name: str,
@@ -1086,7 +1092,7 @@ def perform_condition_analysis(
 def run_condition_ttest(
     fc_data: pd.DataFrame,
     metadata_df: pd.DataFrame,
-    feature_info: Dict[str, Tuple[str, str]],
+    feature_info: Dict[str, Tuple[str, str, str, str]],
     analysis_name: str,
     logger: logging.Logger
 ) -> pd.DataFrame:
@@ -1107,7 +1113,7 @@ def run_condition_ttest(
     
     results = []
     
-    for feature, (net1, net2) in feature_info.items():
+    for feature, (roi1, roi2, net1, net2) in feature_info.items():
         # Get data for each condition
         condition_data = {}
         for cond in conditions:
@@ -1135,6 +1141,8 @@ def run_condition_ttest(
             
             results.append({
                 'ROI': feature,
+                'ROI1': roi1,
+                'ROI2': roi2,
                 'network1': net1,
                 'network2': net2,
                 'reference_condition': ref_condition,
@@ -1164,7 +1172,7 @@ def run_condition_ttest(
 def analyze_followup_by_condition(
     ocd_subjects: List[str],
     metadata_df: pd.DataFrame,
-    feature_info: Dict[str, Tuple[str, str]],
+    feature_info: Dict[str, Tuple[str, str, str, str]],
     input_dir: str,
     atlas_name: str,
     logger: logging.Logger
@@ -1213,7 +1221,7 @@ def analyze_followup_by_condition(
 def analyze_fc_change_by_condition(
     ocd_subjects: List[str],
     metadata_df: pd.DataFrame,
-    feature_info: Dict[str, Tuple[str, str]],
+    feature_info: Dict[str, Tuple[str, str, str, str]],
     input_dir: str,
     atlas_name: str,
     logger: logging.Logger
@@ -1273,7 +1281,7 @@ def analyze_fc_change_by_condition(
 def perform_group_analysis(
     baseline_fc_data: pd.DataFrame,
     metadata_df: pd.DataFrame,
-    feature_info: Dict[str, Tuple[str, str]],
+    feature_info: Dict[str, Tuple[str, str, str, str]],
     output_dir: str,
     atlas_name: str,
     logger: logging.Logger
@@ -1318,7 +1326,7 @@ def perform_longitudinal_analysis(
     metadata_df: pd.DataFrame,
     df_clinical: pd.DataFrame,
     valid_longitudinal: List[str],
-    feature_info: Dict[str, Tuple[str, str]],
+    feature_info: Dict[str, Tuple[str, str, str, str]],
     input_dir: str,
     output_dir: str,
     atlas_name: str,
