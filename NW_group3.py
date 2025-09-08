@@ -132,8 +132,12 @@ import argparse
 import logging
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
-import psutil
 import gc
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 import warnings
 import sys
 
@@ -142,14 +146,17 @@ warnings.filterwarnings('ignore')
 
 def log_memory_usage(logger: logging.Logger, stage: str):
     """Log current memory usage for debugging OOM issues."""
-    try:
-        process = psutil.Process(os.getpid())
-        memory_info = process.memory_info()
-        memory_mb = memory_info.rss / (1024 * 1024)
-        memory_gb = memory_mb / 1024
-        logger.info(f"MEMORY [{stage}]: {memory_mb:.1f} MB ({memory_gb:.2f} GB)")
-    except Exception as e:
-        logger.warning(f"Could not get memory info: {e}")
+    if PSUTIL_AVAILABLE:
+        try:
+            process = psutil.Process(os.getpid())
+            memory_info = process.memory_info()
+            memory_mb = memory_info.rss / (1024 * 1024)
+            memory_gb = memory_mb / 1024
+            logger.info(f"MEMORY [{stage}]: {memory_mb:.1f} MB ({memory_gb:.2f} GB)")
+        except Exception as e:
+            logger.warning(f"Could not get memory info: {e}")
+    else:
+        logger.info(f"MEMORY [{stage}]: psutil not available - memory monitoring disabled")
 
 def log_dataframe_info(logger: logging.Logger, df: pd.DataFrame, name: str):
     """Log DataFrame information for debugging."""
@@ -1752,13 +1759,14 @@ if __name__ == "__main__":
         logging.error("Main execution failed: %s", e)
         print(f"\nError: {e}")
         # Try to log memory usage even if main logging failed
-        try:
-            process = psutil.Process(os.getpid())
-            memory_info = process.memory_info()
-            memory_mb = memory_info.rss / (1024 * 1024)
-            logging.error("Memory at failure: %.1f MB (%.2f GB)", memory_mb, memory_mb/1024)
-        except:
-            pass
+        if PSUTIL_AVAILABLE:
+            try:
+                process = psutil.Process(os.getpid())
+                memory_info = process.memory_info()
+                memory_mb = memory_info.rss / (1024 * 1024)
+                logging.error("Memory at failure: %.1f MB (%.2f GB)", memory_mb, memory_mb/1024)
+            except:
+                pass
         print("\nFor help, run: python NW_group3.py --help")
         print("For usage examples, run: python NW_group3.py --usage")
         raise
