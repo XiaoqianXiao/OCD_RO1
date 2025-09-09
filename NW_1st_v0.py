@@ -830,7 +830,7 @@ def pre_download_schaefer_2018_atlas():
 # ATLAS FETCHING FUNCTIONS
 # =============================================================================
 
-def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: logging.Logger) -> Tuple[Any, Dict[int, str], Dict[str, Any]]:
+def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: logging.Logger) -> Tuple[Any, Dict[int, str]]:
     """Fetch a built-in Nilearn atlas and return the image and network labels."""
     try:
         if atlas_name not in NILEARN_ATLASES:
@@ -1034,7 +1034,7 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
         logger.info(f"Successfully fetched {atlas_name} atlas: {len(network_labels)} ROIs, shape={atlas_img.shape}")
         logger.info(f"Generated {len(set(network_labels.values()))} unique network labels")
         
-        return atlas_img, network_labels, atlas_data
+        return atlas_img, network_labels
         
     except Exception as e:
         logger.error(f"Failed to fetch {atlas_name} atlas: {str(e)}")
@@ -1466,8 +1466,7 @@ def compute_connectivity_measures(
     unique_networks: List[str],
     output_prefix: str,
     logger: logging.Logger,
-    atlas_info: Optional[Dict[str, Any]] = None,
-    meaningful_roi_names: Optional[List[str]] = None
+    atlas_info: Optional[Dict[str, Any]] = None
 ) -> Tuple[str, str, str, str, str]:
     """Compute all connectivity measures and save results."""
     try:
@@ -1505,8 +1504,7 @@ def compute_connectivity_measures(
                 continue
             
             roiroi_fc.append({
-                'ROI1': roi_names[i],
-                'ROI2': roi_names[j],
+                'ROI': f"{roi_names[i]}_{roi_names[j]}",
                 'network1': net_i,
                 'network2': net_j,
                 'FC': corr_matrix[i, j]
@@ -1535,10 +1533,10 @@ def compute_connectivity_measures(
                 
                 if corrs:
                     roi_network_fc.append({
-                        'ROI': roi_names[i],
+                        'ROI': f"{roi_names[i]}_{net_j}",
                         'network1': net_i,
                         'network2': net_j,
-                        'FC': np.mean(corrs)
+                        'fc_value': np.mean(corrs)
                     })
         
         # Save ROI-to-network FC (only for network-based atlases)
@@ -1589,11 +1587,9 @@ def compute_connectivity_measures(
         pd.DataFrame(roi_fc).to_csv(output_roi_csv, index=False)
         logger.info(f"Saved ROI-level FC: {output_roi_csv}")
         
-        # Compute network analysis (within vs between network connectivity)
-        logger.info("Computing network analysis...")
-        network_analysis = []
-        
-        # Within-network connectivity
+        # Compute network summary
+        logger.info("Computing network summary...")
+        network_summary = []
         for net in unique_networks:
             within_corrs = [
                 corr_matrix[i, j] for i in range(len(roi_names)) for j in range(len(roi_names))
@@ -1601,35 +1597,29 @@ def compute_connectivity_measures(
                 and network_labels.get(j + 1, 'Unknown') == net
             ]
             
-            if within_corrs:
-                network_analysis.append({
-                    'network1': net,
-                    'network2': net,
-                    'connectivity_type': 'within',
-                    'FC': np.mean(within_corrs)
-                })
-        
-        # Between-network connectivity
-        for i, net1 in enumerate(unique_networks):
-            for net2 in unique_networks[i+1:]:  # Avoid duplicates and self-connections
+            row = {
+                'Network': net,
+                'Within_Network_FC': np.mean(within_corrs) if within_corrs else np.nan
+            }
+            
+            for other_net in unique_networks:
+                if other_net == net:
+                    continue
+                
                 between_corrs = [
                     corr_matrix[i, j] for i in range(len(roi_names)) for j in range(len(roi_names))
-                    if i != j and network_labels.get(i + 1, 'Unknown') == net1
-                    and network_labels.get(j + 1, 'Unknown') == net2
+                    if i != j and network_labels.get(i + 1, 'Unknown') == net
+                    and network_labels.get(j + 1, 'Unknown') == other_net
                 ]
                 
-                if between_corrs:
-                    network_analysis.append({
-                        'network1': net1,
-                        'network2': net2,
-                        'connectivity_type': 'between',
-                        'FC': np.mean(between_corrs)
-                    })
+                row[f'Between_{other_net}_FC'] = np.mean(between_corrs) if between_corrs else np.nan
+            
+            network_summary.append(row)
         
-        # Save network analysis (only for network-based atlases)
+        # Save network summary (only for network-based atlases)
         if atlas_info is None or atlas_info.get('network_based', True):
-            output_network_csv = f"{output_prefix}_network_analysis.csv"
-            pd.DataFrame(network_analysis).to_csv(output_network_csv, index=False)
+            output_network_csv = f"{output_prefix}_network_summary.csv"
+            pd.DataFrame(network_summary).to_csv(output_network_csv, index=False)
             logger.info(f"Saved network summary: {output_network_csv}")
         else:
             logger.info("Skipping network summary generation for anatomical atlas")
@@ -1705,28 +1695,7 @@ def process_run(
         
         # Compute connectivity measures
         logger.info("Computing connectivity measures...")
-        
-        # Extract actual ROI names from atlas data
-        roi_names = []
-        if atlas_info and 'atlas_data' in atlas_info and 'labels' in atlas_info['atlas_data']:
-            # Use actual labels from atlas data
-            actual_labels = atlas_info['atlas_data']['labels']
-            n_rois = time_series.shape[1]
-            
-            # Skip background label (index 0) if present
-            start_idx = 1 if len(actual_labels) > n_rois else 0
-            for i in range(n_rois):
-                if start_idx + i < len(actual_labels):
-                    roi_names.append(actual_labels[start_idx + i])
-                else:
-                    roi_names.append(f"ROI_{i+1}")
-            
-            logger.info(f"Using actual ROI names from atlas: {roi_names[:5]}...")
-        else:
-            # Fallback to generic names
-            roi_names = [f"ROI_{i+1}" for i in range(time_series.shape[1])]
-            logger.info(f"Using generic ROI names: {roi_names[:5]}...")
-        
+        roi_names = [f"ROI_{i+1}" for i in range(time_series.shape[1])]
         unique_networks = sorted(set(network_labels.values()) - {'Unknown'})
         
         results = compute_connectivity_measures(
@@ -1776,6 +1745,7 @@ Run with --usage for detailed examples or --help for full help.
     parser.add_argument(
         '--subject', 
         type=str, 
+        required=True, 
         help='Subject ID (e.g., sub-AOCD001)'
     )
     parser.add_argument(
@@ -1947,13 +1917,7 @@ def load_atlas_and_labels(
                 raise
             
             logger.info(f"Loaded Power 2011 atlas: 264 ROIs, {len(set(network_labels.values()))} networks")
-            
-            # Create atlas_data with labels for Power 2011
-            atlas_data = {'labels': network_labels_list}
-            atlas_info = NILEARN_ATLASES['power_2011'].copy()
-            atlas_info['atlas_data'] = atlas_data
-            
-            return atlas_img, network_labels, 'power_2011', atlas_info
+            return atlas_img, network_labels, 'power_2011', NILEARN_ATLASES['power_2011']
         
         # For all other Nilearn atlases, use the normal fetch function
         logger.info(f"Fetching Nilearn atlas: {atlas_spec}")
@@ -1970,7 +1934,7 @@ def load_atlas_and_labels(
             params = NILEARN_ATLASES[atlas_spec]['default_params']
         
         # Fetch atlas
-        atlas_img, network_labels, atlas_data = fetch_nilearn_atlas(atlas_spec, params, logger)
+        atlas_img, network_labels = fetch_nilearn_atlas(atlas_spec, params, logger)
         
         # Generate atlas name for output files
         if params:
@@ -1979,10 +1943,7 @@ def load_atlas_and_labels(
         else:
             atlas_name = atlas_spec
         
-        # Create atlas_info with atlas_data
-        atlas_info = NILEARN_ATLASES.get(atlas_spec, {}).copy()
-        atlas_info['atlas_data'] = atlas_data
-        return atlas_img, network_labels, atlas_name, atlas_info
+        return atlas_img, network_labels, atlas_name, NILEARN_ATLASES.get(atlas_name)
     
     else:
         # Custom atlas file
@@ -2046,12 +2007,6 @@ def main():
     
     if args.pre_download_schaefer:
         pre_download_schaefer_2018_atlas()
-        return
-
-    # Validate that subject is provided for actual processing
-    if not args.subject:
-        print("Error: --subject is required for processing")
-        print("Run with --help for usage information")
         return
 
     # Validate arguments
