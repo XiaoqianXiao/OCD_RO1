@@ -726,6 +726,9 @@ def fix_nilearn_data_directory():
     """Fix common Nilearn data directory issues in containerized environments."""
     import tempfile
     import shutil
+    import glob
+    
+    print("Fixing Nilearn data directory issues...")
     
     # Set Nilearn data directory to a writable location
     nilearn_data_dir = os.path.join('/tmp', 'nilearn_data')
@@ -735,22 +738,64 @@ def fix_nilearn_data_directory():
     if os.path.exists(nilearn_data_dir):
         try:
             shutil.rmtree(nilearn_data_dir)
-        except Exception:
-            pass
+            print(f"Removed existing data directory: {nilearn_data_dir}")
+        except Exception as e:
+            print(f"Warning: Could not remove {nilearn_data_dir}: {e}")
     
     os.makedirs(nilearn_data_dir, exist_ok=True)
+    print(f"Created clean data directory: {nilearn_data_dir}")
     
-    # Also try to clear the problematic home directory
-    home_nilearn_dir = '/home/xxqian/nilearn_data'
-    if os.path.exists(home_nilearn_dir):
-        try:
-            if os.path.isfile(home_nilearn_dir):
-                os.remove(home_nilearn_dir)
-            else:
-                shutil.rmtree(home_nilearn_dir)
-        except Exception:
-            pass
+    # Clear all possible problematic directories
+    problematic_dirs = [
+        '/home/xxqian/nilearn_data',
+        '/home/xxqian/.nilearn_data',
+        '/tmp/nilearn_data_old',
+        '/scratch/xxqian/nilearn_data'
+    ]
     
+    for dir_path in problematic_dirs:
+        if os.path.exists(dir_path):
+            try:
+                if os.path.isfile(dir_path):
+                    os.remove(dir_path)
+                    print(f"Removed file: {dir_path}")
+                else:
+                    shutil.rmtree(dir_path)
+                    print(f"Removed directory: {dir_path}")
+            except Exception as e:
+                print(f"Warning: Could not remove {dir_path}: {e}")
+    
+    # Clear any partial downloads in FSL directory
+    fsl_dirs = [
+        '/home/xxqian/nilearn_data/fsl',
+        '/tmp/nilearn_data/fsl',
+        '/scratch/xxqian/nilearn_data/fsl'
+    ]
+    
+    for fsl_dir in fsl_dirs:
+        if os.path.exists(fsl_dir):
+            try:
+                # Remove any .part files (partial downloads)
+                part_files = glob.glob(os.path.join(fsl_dir, '**', '*.part'), recursive=True)
+                for part_file in part_files:
+                    try:
+                        os.remove(part_file)
+                        print(f"Removed partial download: {part_file}")
+                    except Exception:
+                        pass
+                
+                # Remove the entire FSL directory if it's problematic
+                if os.path.exists(fsl_dir):
+                    shutil.rmtree(fsl_dir)
+                    print(f"Removed FSL directory: {fsl_dir}")
+            except Exception as e:
+                print(f"Warning: Could not clean FSL directory {fsl_dir}: {e}")
+    
+    # Set additional environment variables for containerized environment
+    os.environ['NILEARN_SHARE'] = nilearn_data_dir
+    os.environ['NILEARN_CACHE_DIR'] = nilearn_data_dir
+    
+    print("Nilearn data directory fix completed")
     return nilearn_data_dir
 
 def check_nilearn_compatibility():
@@ -855,23 +900,68 @@ def fetch_nilearn_atlas(atlas_name: str, atlas_params: Dict[str, Any], logger: l
                 atlas_data = fetch_func()  # Older version doesn't accept parameters
             else:
                 atlas_data = fetch_func(**params)
-        except OSError as e:
+        except (OSError, FileNotFoundError) as e:
             error_msg = str(e)
-            if "File exists" in error_msg or "nilearn_data" in error_msg:
+            if any(keyword in error_msg.lower() for keyword in ["file exists", "nilearn_data", ".part", "no such file", "harvardoxford"]):
                 logger.warning("Detected Nilearn data directory issue, attempting to fix...")
                 try:
                     fix_nilearn_data_directory()
                     logger.info("Retrying atlas fetch after fixing data directory...")
-                    atlas_data = fetch_func(**params)
+                    # Special handling for older YEO 2011 version
+                    if atlas_name == 'yeo_2011':
+                        atlas_data = fetch_func()  # Older version doesn't accept parameters
+                    else:
+                        atlas_data = fetch_func(**params)
+                    logger.info("Successfully fetched atlas after fixing data directory")
                 except Exception as retry_e:
-                    logger.error(f"Failed to fetch {atlas_name} atlas after fixing data directory: {str(retry_e)}")
-                    logger.error("This might be due to:")
-                    logger.error("1. Network connectivity issues")
-                    logger.error("2. Insufficient disk space")
-                    logger.error("3. Nilearn version compatibility")
-                    logger.error("4. Persistent data directory issues")
-                    logger.error("Try running with --fix-nilearn-data option")
-                    raise
+                    logger.warning(f"First retry failed: {str(retry_e)}")
+                    logger.info("Trying alternative data directory locations...")
+                    
+                    # Try alternative data directory locations
+                    alternative_dirs = [
+                        '/tmp/nilearn_data_alt',
+                        '/scratch/xxqian/nilearn_data',
+                        '/tmp/nilearn_data_clean'
+                    ]
+                    
+                    success = False
+                    for alt_dir in alternative_dirs:
+                        try:
+                            logger.info(f"Trying data directory: {alt_dir}")
+                            os.environ['NILEARN_DATA'] = alt_dir
+                            os.environ['NILEARN_SHARE'] = alt_dir
+                            os.environ['NILEARN_CACHE_DIR'] = alt_dir
+                            
+                            # Create clean directory
+                            if os.path.exists(alt_dir):
+                                import shutil
+                                shutil.rmtree(alt_dir)
+                            os.makedirs(alt_dir, exist_ok=True)
+                            
+                            # Try fetching again
+                            if atlas_name == 'yeo_2011':
+                                atlas_data = fetch_func()
+                            else:
+                                atlas_data = fetch_func(**params)
+                            
+                            logger.info(f"Successfully fetched atlas using {alt_dir}")
+                            success = True
+                            break
+                            
+                        except Exception as alt_e:
+                            logger.debug(f"Failed with {alt_dir}: {alt_e}")
+                            continue
+                    
+                    if not success:
+                        logger.error(f"Failed to fetch {atlas_name} atlas after trying all data directory locations")
+                        logger.error("This might be due to:")
+                        logger.error("1. Network connectivity issues")
+                        logger.error("2. Insufficient disk space")
+                        logger.error("3. Nilearn version compatibility")
+                        logger.error("4. Persistent data directory issues")
+                        logger.error("5. Container permissions issues")
+                        logger.error("Try running with --fix-nilearn-data option")
+                        raise
             else:
                 logger.error(f"Failed to fetch {atlas_name} atlas: {error_msg}")
                 logger.error("This might be due to:")
@@ -2019,6 +2109,33 @@ def main():
     """Main function to process functional connectivity analysis."""
     # Parse command line arguments
     args = parse_arguments()
+    
+    # Auto-fix Nilearn data directory issues in containerized environments
+    if os.path.exists('/.singularity.d') or os.path.exists('/.dockerenv') or 'APPTAINER_CONTAINER' in os.environ:
+        print("Detected containerized environment, checking Nilearn data directory...")
+        try:
+            # Check if there are any problematic directories
+            problematic_dirs = [
+                '/home/xxqian/nilearn_data',
+                '/home/xxqian/.nilearn_data'
+            ]
+            
+            needs_fix = False
+            for dir_path in problematic_dirs:
+                if os.path.exists(dir_path):
+                    # Check for .part files or corrupted downloads
+                    import glob
+                    part_files = glob.glob(os.path.join(dir_path, '**', '*.part'), recursive=True)
+                    if part_files:
+                        needs_fix = True
+                        break
+            
+            if needs_fix:
+                print("Found corrupted Nilearn data, auto-fixing...")
+                fix_nilearn_data_directory()
+                print("✅ Auto-fix completed")
+        except Exception as e:
+            print(f"Warning: Could not auto-fix Nilearn data directory: {e}")
     
     # Handle usage and help requests
     if args.usage:
