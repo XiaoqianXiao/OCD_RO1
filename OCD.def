@@ -22,18 +22,18 @@ From: OCD.0.sif
     NW_1st.py /app/NW_1st.py
     ROI_1st.py /app/ROI_1st.py
     PCC_ROI_1st.py /app/PCC_ROI_1st.py
-    NW_group.py /app/NW_group.py
-    NW_group2.py /app/NW_group2.py
-    NW_group3.py /app/NW_group3.py
+    NW_group.py /app/NW_roi_network.py
+    NW_group2.py /app/NW_network_network.py
+    NW_group3.py /app/NW_roi_roi.py
     ROI_group.py /app/ROI_group.py
 
 %post
     chmod +x /app/STV_1st.py
     chmod +x /app/STV_group.py
     chmod +x /app/NW_1st.py
-    chmod +x /app/NW_group.py
-    chmod +x /app/NW_group2.py
-    chmod +x /app/NW_group3.py
+    chmod +x /app/NW_roi_network.py
+    chmod +x /app/NW_network_network.py
+    chmod +x /app/NW_roi_roi.py
     chmod +x /app/ROI_1st.py
     chmod +x /app/ROI_group.py
     chmod +x /app/PCC_ROI_1st.py
@@ -50,13 +50,13 @@ else if the first argument is "first-level-roi":
 else if the first argument is "group-level-STV":
     run: python3 /app/STV_group.py with all arguments after the first one
 else if the first argument is "group-level-NW":
-    run: python3 /app/NW_group.py with all arguments after the first one
+    run: python3 /app/NW_roi_network.py with all arguments after the first one
 else if the first argument is "group-level-ROI":
     run: python3 /app/ROI_group.py with all arguments after the first one
 else if the first argument is "group-level-NW2":
-    run: python3 /app/NW_group2.py with all arguments after the first one
+    run: python3 /app/NW_network_network.py with all arguments after the first one
 else if the first argument is "group-level-NW3":
-    run: python3 /app/NW_group3.py with all arguments after the first one
+    run: python3 /app/NW_roi_roi.py with all arguments after the first one
 else:
     print: "Usage: apptainer run [roi-to-roi|first-level|group-level] [script arguments]"
     print: "Example: apptainer run OCD.sif roi-to-roi --subject sub-AOCD001"
