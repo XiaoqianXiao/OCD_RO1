@@ -154,6 +154,35 @@ def log_dataframe_info(logger: logging.Logger, df: pd.DataFrame, name: str):
 # CONFIGURATION
 # =============================================================================
 
+def extract_roi_names_from_feature(feature_name: str) -> Tuple[str, str]:
+    """Extract ROI1 and ROI2 names from feature name.
+    
+    Feature names are in format "ROI1_ROI2" where ROI names can contain underscores.
+    This function attempts to split them correctly by finding the right split point.
+    """
+    if '_' not in feature_name:
+        return feature_name, ''
+    
+    # For ROI-to-ROI features, the format is "ROI1_ROI2"
+    # Since ROI names can contain underscores, we need to be careful about splitting
+    # We'll use a heuristic: look for the pattern where ROI1 ends and ROI2 begins
+    # This is tricky because ROI names can have underscores, but we can try to find
+    # a reasonable split point
+    
+    # Try to find a split that makes sense by looking for common patterns
+    # For now, let's use a simple approach: split in the middle if possible
+    parts = feature_name.split('_')
+    if len(parts) >= 2:
+        # Try to find a reasonable split point
+        # Look for patterns that might indicate where ROI1 ends
+        # This is a simplified approach - in practice, you might need more sophisticated parsing
+        mid_point = len(parts) // 2
+        roi1 = '_'.join(parts[:mid_point])
+        roi2 = '_'.join(parts[mid_point:])
+        return roi1, roi2
+    else:
+        return feature_name, ''
+
 # Default configuration
 DEFAULT_CONFIG = {
     'output_dir': '/project/6079231/dliang55/R01_AOCD/NW_group',
@@ -433,20 +462,24 @@ def run_ttest(
     results = []
     dropped_features = []
     
-    for feature, (net1, net2) in feature_info.items():
+    for feature, info in feature_info.items():
+        if len(info) >= 4:
+            network1, network2, roi1, roi2 = info
+        else:
+            network1, network2 = info
         hc_values = fc_data_hc[feature].dropna()
         ocd_values = fc_data_ocd[feature].dropna()
         
         logger.debug(
             "Feature %s (%s_%s): HC n=%d, OCD n=%d", 
-            feature, net1, net2, len(hc_values), len(ocd_values)
+            feature, network1, network2, len(hc_values), len(ocd_values)
         )
         
         if len(hc_values) < DEFAULT_CONFIG['min_subjects_per_group'] or \
            len(ocd_values) < DEFAULT_CONFIG['min_subjects_per_group']:
             logger.warning(
                 "Skipping feature %s (%s_%s) due to insufficient data (HC n=%d, OCD n=%d)",
-                feature, net1, net2, len(hc_values), len(ocd_values)
+                feature, network1, network2, len(hc_values), len(ocd_values)
             )
             dropped_features.append((feature, f"HC n={len(hc_values)}, OCD n={len(ocd_values)}"))
             continue
@@ -454,14 +487,19 @@ def run_ttest(
         # Perform t-test
         t_stat, p_val = stats.ttest_ind(ocd_values, hc_values, equal_var=False)
         
-        # Extract ROI1 and ROI2 from feature name
-        roi1, roi2 = feature.split('_', 1) if '_' in feature else (feature, '')
+        # Get ROI1 and ROI2 from feature_info
+        if len(feature_info[feature]) >= 4:
+            network1, network2, roi1, roi2 = feature_info[feature]
+        else:
+            # Fallback to old format
+            network1, network2 = feature_info[feature]
+            roi1, roi2 = extract_roi_names_from_feature(feature)
         
         results.append({
             'ROI1': roi1,
             'ROI2': roi2,
-            'network1': net1,
-            'network2': net2,
+            'network1': network1,
+            'network2': network2,
             't_statistic': t_stat,
             'p_value': p_val,
             'OCD_mean': np.mean(ocd_values),
@@ -559,12 +597,16 @@ def run_regression(
         )
 
     # Run regression for each feature
-    for feature, (net1, net2) in feature_info.items():
+    for feature, info in feature_info.items():
+        if len(info) >= 4:
+            network1, network2, roi1, roi2 = info
+        else:
+            network1, network2 = info
         x = fc_data[feature].dropna()
         if x.empty:
             logger.warning(
                 "Skipping feature %s (%s_%s) in %s regression due to empty data",
-                feature, net1, net2, analysis_name
+                feature, network1, network2, analysis_name
             )
             dropped_features.append((feature, "empty data"))
             continue
@@ -573,14 +615,14 @@ def run_regression(
         
         logger.debug(
             "Feature %s (%s_%s) in %s regression: n=%d", 
-            feature, net1, net2, analysis_name, len(y)
+            feature, network1, network2, analysis_name, len(y)
         )
         
         if len(x) < DEFAULT_CONFIG['min_subjects_per_group'] or \
            len(y) < DEFAULT_CONFIG['min_subjects_per_group']:
             logger.warning(
                 "Skipping feature %s (%s_%s) in %s regression due to insufficient data (n=%d)",
-                feature, net1, net2, analysis_name, len(y)
+                feature, network1, network2, analysis_name, len(y)
             )
             dropped_features.append((feature, f"n={len(y)}"))
             continue
@@ -591,7 +633,7 @@ def run_regression(
         if len(feature_data) < DEFAULT_CONFIG['min_subjects_per_group']:
             logger.warning(
                 "Skipping feature %s (%s_%s) in %s regression due to insufficient data (n=%d)",
-                feature, net1, net2, analysis_name, len(feature_data)
+                feature, network1, network2, analysis_name, len(feature_data)
             )
             dropped_features.append((feature, f"n={len(feature_data)}"))
             continue
@@ -630,14 +672,19 @@ def run_regression(
             x = feature_data[feature].values
             y_vals = regression_data['y_values'].values
             r_value = np.corrcoef(x, y_vals)[0, 1] if len(x) > 1 else 0
-                        # Extract ROI1 and ROI2 from feature name
-            roi1, roi2 = feature.split('_', 1) if '_' in feature else (feature, '')
+            # Get ROI1 and ROI2 from feature_info
+            if len(feature_info[feature]) >= 4:
+                network1, network2, roi1, roi2 = feature_info[feature]
+            else:
+                # Fallback to old format
+                network1, network2 = feature_info[feature]
+                roi1, roi2 = extract_roi_names_from_feature(feature)
             
             results.append({
                 'ROI1': roi1,
                 'ROI2': roi2,
-                'network1': net1,
-                'network2': net2,
+                'network1': network1,
+                'network2': network2,
                 'fc_effect': fc_effect,  # Effect of FC on outcome
                 'fc_p_value': fc_pval,
                 'r_value': r_value,
@@ -651,7 +698,7 @@ def run_regression(
         except Exception as e:
             logger.warning(
                 "Failed to run regression with condition confounder for feature %s (%s_%s): %s",
-                feature, net1, net2, e
+                feature, network1, network2, e
             )
             # Fallback to simple regression
             x = feature_data[feature].values.reshape(-1, 1)
@@ -946,7 +993,9 @@ def load_roiroi_fc_data(
                     # Use actual network information from the data
                     network1 = row.get('network1', 'Unknown')
                     network2 = row.get('network2', 'Unknown')
-                    feature_info[roi_pair] = (network1, network2)
+                    roi1 = row.get('ROI1', 'Unknown')
+                    roi2 = row.get('ROI2', 'Unknown')
+                    feature_info[roi_pair] = (network1, network2, roi1, roi2)
                 logger.debug(
                     "Identified %d ROI-to-ROI feature columns with network mappings", 
                     len(feature_info)
@@ -1118,7 +1167,11 @@ def run_condition_ttest(
     
     results = []
     
-    for feature, (net1, net2) in feature_info.items():
+    for feature, info in feature_info.items():
+        if len(info) >= 4:
+            network1, network2, roi1, roi2 = info
+        else:
+            network1, network2 = info
         # Get data for each condition
         condition_data = {}
         for cond in conditions:
@@ -1202,7 +1255,7 @@ def analyze_followup_by_condition(
         
         try:
             follow_fc = pd.read_csv(follow_path)
-            follow_fc['feature_id'] = follow_fc['ROI']
+            follow_fc['feature_id'] = follow_fc['ROI1'] + '_' + follow_fc['ROI2']
             
             # Pivot to make features as columns
             follow_pivot = follow_fc.pivot_table(
@@ -1256,8 +1309,8 @@ def analyze_fc_change_by_condition(
             follow_fc = pd.read_csv(follow_path)
             
             # Create feature identifiers
-            base_fc['feature_id'] = base_fc['ROI']
-            follow_fc['feature_id'] = follow_fc['ROI']
+            base_fc['feature_id'] = base_fc['ROI1'] + '_' + base_fc['ROI2']
+            follow_fc['feature_id'] = follow_fc['ROI1'] + '_' + follow_fc['ROI2']
             
             # Pivot and compute change
             base_pivot = base_fc.pivot_table(
@@ -1420,8 +1473,8 @@ def perform_longitudinal_analysis(
             )
             
             # Create feature identifiers
-            base_fc['feature_id'] = base_fc['ROI']
-            follow_fc['feature_id'] = follow_fc['ROI']
+            base_fc['feature_id'] = base_fc['ROI1'] + '_' + base_fc['ROI2']
+            follow_fc['feature_id'] = follow_fc['ROI1'] + '_' + follow_fc['ROI2']
             
             # Pivot and compute change
             base_pivot = base_fc.pivot_table(
