@@ -22,9 +22,9 @@ From: OCD.0.sif
     NW_1st.py /app/NW_1st.py
     ROI_1st.py /app/ROI_1st.py
     PCC_ROI_1st.py /app/PCC_ROI_1st.py
-    NW_group.py /app/NW_roi_network.py
-    NW_group2.py /app/NW_network_network.py
-    NW_group3.py /app/NW_roi_roi.py
+    NW_roi_network.py /app/NW_roi_network.py
+    NW_network_network.py /app/NW_network_network.py
+    NW_roi_roi.py /app/NW_roi_roi.py
     ROI_group.py /app/ROI_group.py
 
 %post
