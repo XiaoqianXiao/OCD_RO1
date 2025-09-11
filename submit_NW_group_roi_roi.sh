@@ -60,7 +60,7 @@ INPUT_DIR="${SCRATCH_DIR}/OCD/NW_1st"
 
 
 # Bind directories
-APPTAINER_BIND="/scratch/xxqian/repo/OCD_RO1/NW_group3.py:/app/NW_group3.py,${PROJECT_DIR}/metadata:/metadata,${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv,${INPUT_DIR}:/input,${OUTPUT_DIR}:/output"
+APPTAINER_BIND="/scratch/xxqian/repo/OCD_RO1/NW_roi_roi.py:/app/NW_roi_roi.py,${PROJECT_DIR}/metadata:/metadata,${CLINICAL_CSV}:/clinical.csv,${SUBJECTS_CSV}:/subjects.csv,${INPUT_DIR}:/input,${OUTPUT_DIR}:/output"
 
 # Verify bind paths
 for path in "${SCRATCH_DIR}/OCD" "${PROJECT_DIR}/metadata" "${CLINICAL_CSV}" "${SUBJECTS_CSV}" "${INPUT_DIR}" "${OUTPUT_DIR}"; do
@@ -76,7 +76,7 @@ mkdir -p "${OUTPUT_DIR}"
 
 # Run the Python script inside the Apptainer container
 echo "Starting ROI-to-ROI FC group analysis..."
-apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_group3.py \
+apptainer exec --bind "${APPTAINER_BIND}" ${CONTAINER} python3 /app/NW_roi_roi.py \
     --subjects_csv /subjects.csv \
     --clinical_csv /clinical.csv \
     --output_dir /output \
