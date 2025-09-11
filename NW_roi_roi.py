@@ -183,6 +183,35 @@ def extract_roi_names_from_feature(feature_name: str) -> Tuple[str, str]:
     else:
         return feature_name, ''
 
+def sanitize_feature_name_for_formula(feature_name: str) -> str:
+    """Sanitize feature name for use in regression formulas.
+    
+    Removes or replaces special characters that would make invalid Python variable names.
+    """
+    import re
+    
+    # Replace spaces with underscores
+    sanitized = feature_name.replace(' ', '_')
+    
+    # Remove or replace special characters that are invalid in Python variable names
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', sanitized)
+    
+    # Remove multiple consecutive underscores
+    sanitized = re.sub(r'_+', '_', sanitized)
+    
+    # Remove leading/trailing underscores
+    sanitized = sanitized.strip('_')
+    
+    # Ensure it starts with a letter or underscore
+    if sanitized and not sanitized[0].isalpha() and sanitized[0] != '_':
+        sanitized = 'feature_' + sanitized
+    
+    # Ensure it's not empty
+    if not sanitized:
+        sanitized = 'feature_unknown'
+    
+    return f"feature_{sanitized}"
+
 # Default configuration
 DEFAULT_CONFIG = {
     'output_dir': '/project/6079231/dliang55/R01_AOCD/NW_group',
@@ -641,8 +670,11 @@ def run_regression(
         try:
             # Perform multiple linear regression with condition as confounder
             # Create formula for regression with condition confounder
+            # Ensure feature name is a regular string (not byte string)
+            if isinstance(feature, bytes):
+                feature = feature.decode('utf-8')
             # Sanitize feature name for formula (remove special characters)
-            safe_feature = f"feature_{feature.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')}"
+            safe_feature = sanitize_feature_name_for_formula(feature)
             
             # Prepare data for regression with sanitized column names
             regression_data = feature_data.copy()
@@ -701,6 +733,9 @@ def run_regression(
                 feature, network1, network2, e
             )
             # Fallback to simple regression
+            # Ensure feature name is a regular string (not byte string)
+            if isinstance(feature, bytes):
+                feature = feature.decode('utf-8')
             x = feature_data[feature].values.reshape(-1, 1)
             y_vals = y_values.loc[feature_data['subject_id']].values
             slope, intercept, r_value, p_val, _ = stats.linregress(x.flatten(), y_vals)
@@ -995,11 +1030,23 @@ def load_roiroi_fc_data(
                 feature_info = {}
                 for _, row in fc_df.iterrows():
                     roi_pair = row['ROI1'] + '_' + row['ROI2']
+                    # Ensure all values are regular strings (not byte strings)
+                    if isinstance(roi_pair, bytes):
+                        roi_pair = roi_pair.decode('utf-8')
                     # Use actual network information from the data
                     network1 = row.get('network1', 'Unknown')
                     network2 = row.get('network2', 'Unknown')
                     roi1 = row.get('ROI1', 'Unknown')
                     roi2 = row.get('ROI2', 'Unknown')
+                    # Ensure all values are regular strings
+                    if isinstance(network1, bytes):
+                        network1 = network1.decode('utf-8')
+                    if isinstance(network2, bytes):
+                        network2 = network2.decode('utf-8')
+                    if isinstance(roi1, bytes):
+                        roi1 = roi1.decode('utf-8')
+                    if isinstance(roi2, bytes):
+                        roi2 = roi2.decode('utf-8')
                     feature_info[roi_pair] = (network1, network2, roi1, roi2)
                 logger.debug(
                     "Identified %d ROI-to-ROI feature columns with network mappings", 
@@ -1015,6 +1062,9 @@ def load_roiroi_fc_data(
                 columns='feature_id',
                 values='FC'
             ).reset_index(drop=True)
+            
+            # Ensure all column names are regular strings (not byte strings)
+            fc_pivot.columns = [col.decode('utf-8') if isinstance(col, bytes) else col for col in fc_pivot.columns]
             
             # Memory monitoring disabled
             log_dataframe_info(logger, fc_pivot, f"pivoted_data_{sid}")

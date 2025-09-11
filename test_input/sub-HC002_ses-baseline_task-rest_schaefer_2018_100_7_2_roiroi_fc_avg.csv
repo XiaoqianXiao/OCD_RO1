@@ -1,4 +1,0 @@
-ROI1,ROI2,network1,network2,FC
-7Networks_RH_SalVentAttn_FrOperIns_1,7Networks_RH_Cont_pCun_1,SalVentAttn,Cont,0.8
-7Networks_RH_SalVentAttn_FrOperIns_1,7Networks_RH_Default_Par_1,SalVentAttn,Default,0.6
-7Networks_RH_Cont_pCun_1,7Networks_RH_Default_Par_1,Cont,Default,0.7
