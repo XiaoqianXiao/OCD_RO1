@@ -705,14 +705,19 @@ def run_regression(
             y_vals = y_values.loc[feature_data['subject_id']].values
             slope, intercept, r_value, p_val, _ = stats.linregress(x.flatten(), y_vals)
             
-            # Extract ROI1 and ROI2 from feature name
-            roi1, roi2 = feature.split('_', 1) if '_' in feature else (feature, '')
+            # Get ROI1 and ROI2 from feature_info
+            if len(feature_info[feature]) >= 4:
+                network1, network2, roi1, roi2 = feature_info[feature]
+            else:
+                # Fallback to old format
+                network1, network2 = feature_info[feature]
+                roi1, roi2 = extract_roi_names_from_feature(feature)
             
             results.append({
                 'ROI1': roi1,
                 'ROI2': roi2,
-                'network1': net1,
-                'network2': net2,
+                'network1': network1,
+                'network2': network2,
                 'slope': slope,
                 'intercept': intercept,
                 'r_value': r_value,
@@ -1197,14 +1202,19 @@ def run_condition_ttest(
             ref_mean = np.mean(ref_values)
             cond_mean = np.mean(cond_values)
             
-            # Extract ROI1 and ROI2 from feature name
-            roi1, roi2 = feature.split('_', 1) if '_' in feature else (feature, '')
+            # Get ROI1 and ROI2 from feature_info
+            if len(feature_info[feature]) >= 4:
+                network1, network2, roi1, roi2 = feature_info[feature]
+            else:
+                # Fallback to old format
+                network1, network2 = feature_info[feature]
+                roi1, roi2 = extract_roi_names_from_feature(feature)
             
             results.append({
                 'ROI1': roi1,
                 'ROI2': roi2,
-                'network1': net1,
-                'network2': net2,
+                'network1': network1,
+                'network2': network2,
                 'reference_condition': ref_condition,
                 'comparison_condition': cond,
                 't_statistic': t_stat,
