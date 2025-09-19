@@ -49,10 +49,7 @@ ROI_DIR="/scratch/xxqian/roi"
 # Default SLURM parameters
 SLURM_TIME="2:00:00"
 SLURM_MEM="16G"
-SLURM_CPUS="2"
-SLURM_ACCOUNT="xxqian"
-SLURM_MAIL_TYPE="END"
-SLURM_MAIL_USER="xxqian@stanford.edu"
+SLURM_ACCOUNT="def-jfeusner"
 
 # Default analysis parameters
 VERBOSE=""
@@ -93,8 +90,6 @@ OPTIONS:
   --mem MEM                 SLURM memory limit (default: 16G)
   --cpus CPUS               SLURM CPUs per task (default: 2)
   --account ACCOUNT         SLURM account (default: xxqian)
-  --mail-type TYPE          SLURM mail type (default: END)
-  --mail-user USER          SLURM mail user (default: xxqian@stanford.edu)
   --verbose                 Enable verbose logging
   --dry-run                 Show what would be submitted without submitting
 
