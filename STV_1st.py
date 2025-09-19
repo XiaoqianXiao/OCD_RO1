@@ -178,6 +178,12 @@ def process_confounds(confounds_file: str, logger: logging.Logger) -> Tuple[pd.D
     """Process confounds file and return motion parameters and valid timepoints."""
     try:
         confounds_df = pd.read_csv(confounds_file, sep='\t')
+
+        # Select aCompCor components (top 5)
+        compcor_cols = [
+            col for col in confounds_df.columns 
+            if 'a_comp_cor' in col or 'aCompCor' in col
+        ][:5]
         
         # Select motion parameters
         motion_cols = [
@@ -187,32 +193,34 @@ def process_confounds(confounds_file: str, logger: logging.Logger) -> Tuple[pd.D
             'rot_x_derivative1', 'rot_y_derivative1', 'rot_z_derivative1'
         ]
         available_motion = [col for col in motion_cols if col in confounds_df.columns]
+        # Combine selected confounds
+        selected_cols = compcor_cols + available_motion
+        motion_params = confounds_df[selected_cols].fillna(0) if selected_cols else pd.DataFrame(index=confounds_df.index)
         
-        if not available_motion:
-            logger.warning(f"No motion parameters found in {confounds_file}")
-            motion_params = pd.DataFrame(index=confounds_df.index)
-        else:
-            motion_params = confounds_df[available_motion].fillna(0)
-        
-        # Create motion flags
+        # Add FD outlier column to motion_params
         if 'framewise_displacement' in confounds_df.columns:
-            fd_flags = confounds_df['framewise_displacement'].fillna(0) > DEFAULT_CONFIG['fd_threshold']
+            fd_outliers = (confounds_df['framewise_displacement'].fillna(0) > DEFAULT_CONFIG['fd_threshold']).astype(int)
         else:
             logger.warning("No framewise_displacement column found, assuming no excessive motion")
-            fd_flags = pd.Series([False] * len(confounds_df))
+            fd_outliers = pd.Series([0] * len(confounds_df), dtype=int)
         
-        # Create global signal flags
-        gs_flags = pd.Series([False] * len(confounds_df))
+        # Add global signal outlier column to motion_params
         if 'global_signal' in confounds_df.columns:
             global_signal = confounds_df['global_signal'].fillna(confounds_df['global_signal'].mean())
             gs_z_scores = np.abs((global_signal - global_signal.mean()) / global_signal.std())
-            gs_flags = gs_z_scores > DEFAULT_CONFIG['gs_threshold']
-            logger.debug(f"Global signal flags: {gs_flags.sum()}/{len(gs_flags)}")
+            gs_outliers = (gs_z_scores > DEFAULT_CONFIG['gs_threshold']).astype(int)
+            logger.debug(f"Global signal outliers: {gs_outliers.sum()}/{len(gs_outliers)}")
         else:
-            logger.warning("Global signal not found in confounds; using FD flags only")
+            logger.warning("Global signal not found in confounds; using FD outliers only")
+            gs_outliers = pd.Series([0] * len(confounds_df), dtype=int)
         
-        # Combine artifact flags
-        art_flags = fd_flags | gs_flags
+        # Add outlier columns to motion_params
+        motion_params = motion_params.copy()
+        motion_params['fd_outlier'] = fd_outliers
+        motion_params['gs_outlier'] = gs_outliers
+        
+        # Combine artifact flags for valid timepoints
+        art_flags = (fd_outliers == 1) | (gs_outliers == 1)
         valid_timepoints = ~art_flags
         
         logger.info(f"Confounds processed: {len(available_motion)} motion parameters")
@@ -247,10 +255,10 @@ def extract_seed_time_series(
             low_pass=DEFAULT_CONFIG['low_pass'],
             high_pass=DEFAULT_CONFIG['high_pass'],
             t_r=DEFAULT_CONFIG['tr'],
-            confounds=motion_params[valid_timepoints] if not motion_params.empty else None
+            confounds=motion_params if not motion_params.empty else None
         )
         
-        seed_time_series = seed_masker.fit_transform(fmri_img)[valid_timepoints]
+        seed_time_series = seed_masker.fit_transform(fmri_img)
         seed_time_series = np.mean(seed_time_series, axis=1)  # Average across seed voxels
         
         logger.info(f"Extracted seed time series with shape: {seed_time_series.shape}")
@@ -269,7 +277,6 @@ def extract_voxel_time_series(
     fmri_img: Any,
     brain_mask: Any,
     motion_params: pd.DataFrame,
-    valid_timepoints: pd.Series,
     logger: logging.Logger
 ) -> Optional[np.ndarray]:
     """Extract brain voxel time series using NiftiMasker."""
@@ -283,10 +290,10 @@ def extract_voxel_time_series(
             low_pass=DEFAULT_CONFIG['low_pass'],
             high_pass=DEFAULT_CONFIG['high_pass'],
             t_r=DEFAULT_CONFIG['tr'],
-            confounds=motion_params[valid_timepoints] if not motion_params.empty else None
+            confounds=motion_params if not motion_params.empty else None
         )
         
-        brain_time_series = brain_masker.fit_transform(fmri_img)[valid_timepoints]
+        brain_time_series = brain_masker.fit_transform(fmri_img)
         
         logger.info(f"Extracted brain time series with shape: {brain_time_series.shape}")
         
@@ -363,9 +370,6 @@ def process_run(
         logger.info("Processing confounds...")
         motion_params, valid_timepoints = process_confounds(confounds_file, logger)
         
-        if valid_timepoints.sum() < DEFAULT_CONFIG['min_timepoints']:
-            logger.error(f"Too few valid timepoints ({valid_timepoints.sum()})")
-            return None
         
         # Extract seed time series
         logger.info("Extracting seed time series...")
