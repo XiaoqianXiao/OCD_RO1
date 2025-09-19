@@ -435,7 +435,7 @@ echo "Subject: $subject"
 echo "Working directory: \$SLURM_SUBMIT_DIR"
 
 # Load modules (if needed)
-# module load fsl
+module load apptainer
 
 # Run the analysis
 echo "Starting STV_1st.py analysis for $subject"
