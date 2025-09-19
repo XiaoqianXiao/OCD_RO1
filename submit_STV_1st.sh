@@ -396,7 +396,6 @@ APPTAINER_BIND="/project/6079231/dliang55/R01_AOCD:/project/6079231/dliang55/R01
 
 echo "SLURM Time: $SLURM_TIME"
 echo "SLURM Memory: $SLURM_MEM"
-echo "SLURM CPUs: $SLURM_CPUS"
 echo "Subjects: $SUBJECTS"
 echo "=" * 80
 
@@ -425,10 +424,8 @@ for subject in "${SUBJECT_ARRAY[@]}"; do
 #SBATCH --error=${subject_work_dir}/%j.err
 #SBATCH --time=${SLURM_TIME}
 #SBATCH --mem=${SLURM_MEM}
-#SBATCH --cpus-per-task=${SLURM_CPUS}
+#SBATCH --cpus-per-task=1
 #SBATCH --account=${SLURM_ACCOUNT}
-#SBATCH --mail-type=${SLURM_MAIL_TYPE}
-#SBATCH --mail-user=${SLURM_MAIL_USER}
 
 # Job information
 echo "Job started at: \$(date)"
