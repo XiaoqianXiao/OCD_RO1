@@ -304,20 +304,8 @@ while [[ $# -gt 0 ]]; do
             SLURM_MEM="$2"
             shift 2
             ;;
-        --cpus)
-            SLURM_CPUS="$2"
-            shift 2
-            ;;
         --account)
             SLURM_ACCOUNT="$2"
-            shift 2
-            ;;
-        --mail-type)
-            SLURM_MAIL_TYPE="$2"
-            shift 2
-            ;;
-        --mail-user)
-            SLURM_MAIL_USER="$2"
             shift 2
             ;;
         --verbose)
