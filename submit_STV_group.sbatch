@@ -241,12 +241,6 @@ main() {
     # Run the analysis
     log_info "Executing STV_group.py for group analysis..."
     
-    # Check if apptainer command is available
-    if ! command -v apptainer >/dev/null 2>&1; then
-        log_error "Apptainer command not found. Please ensure apptainer is installed and in PATH."
-        log_error "You may need to: module load apptainer"
-        exit 1
-    fi
     
     apptainer exec \
         --bind "$bind_string" \
