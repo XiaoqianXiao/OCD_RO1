@@ -241,7 +241,7 @@ def extract_seed_time_series(
     seed_roi: Any,
     brain_mask: Any,
     motion_params: pd.DataFrame,
-    valid_timepoints: pd.Series,
+    work_dir: str,
     logger: logging.Logger
 ) -> Optional[np.ndarray]:
     """Extract seed ROI time series using NiftiMasker."""
@@ -277,6 +277,7 @@ def extract_voxel_time_series(
     fmri_img: Any,
     brain_mask: Any,
     motion_params: pd.DataFrame,
+    work_dir: str,
     logger: logging.Logger
 ) -> Optional[np.ndarray]:
     """Extract brain voxel time series using NiftiMasker."""
@@ -374,7 +375,7 @@ def process_run(
         # Extract seed time series
         logger.info("Extracting seed time series...")
         seed_time_series = extract_seed_time_series(
-            fmri_img, seed_roi, brain_mask, motion_params, valid_timepoints, logger
+            fmri_img, seed_roi, brain_mask, motion_params, work_dir, logger
         )
         
         if seed_time_series is None:
@@ -383,7 +384,7 @@ def process_run(
         # Extract brain time series
         logger.info("Extracting brain time series...")
         brain_result = extract_voxel_time_series(
-            fmri_img, brain_mask, motion_params, valid_timepoints, logger
+            fmri_img, brain_mask, motion_params, work_dir, logger
         )
         
         if brain_result is None:
