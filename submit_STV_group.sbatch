@@ -26,7 +26,7 @@ set -euo pipefail  # Exit on error, undefined vars, pipe failures
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-module load apptainer
+
 # Container and script paths
 CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
 SCRIPT_PATH="/scratch/xxqian/repo/OCD_RO1/STV_group.py"
@@ -161,11 +161,7 @@ setup_environment() {
     log_info "Setting up environment..."
     
     # Load required modules
-    if command -v module >/dev/null 2>&1; then
-        module load apptainer
-    else
-        log_warning "Module system not available, trying to use apptainer directly"
-    fi
+    module load apptainer
     
     # Set environment variables for optimal performance
     export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
