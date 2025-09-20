@@ -55,12 +55,6 @@ FSL_CONFIG=(
 # HELPER FUNCTIONS
 # =============================================================================
 
-log_message() {
-    local level="$1"
-    shift
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [${level}] $*"
-}
-
 log_info() {
     log_message "INFO" "$@"
 }
@@ -161,7 +155,11 @@ setup_environment() {
     log_info "Setting up environment..."
     
     # Load required modules
-    module load apptainer
+    if command -v module >/dev/null 2>&1; then
+        module load apptainer
+    else
+        log_warning "Module system not available, trying to use apptainer directly"
+    fi
     
     # Set environment variables for optimal performance
     export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
