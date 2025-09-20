@@ -22,8 +22,6 @@ set -euo pipefail  # Exit on error, undefined vars, pipe failures
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --account=def-jfeusner
-#SBATCH --mail-type=FAIL
-#SBATCH --mail-user=$USER
 
 # =============================================================================
 # CONFIGURATION
