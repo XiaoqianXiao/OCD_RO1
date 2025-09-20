@@ -32,13 +32,13 @@ warnings.filterwarnings('ignore')
 
 # Default configuration
 DEFAULT_CONFIG = {
-    'output_dir': '/project/6079231/dliang55/R01_AOCD/STV_group',
+    'output_dir': '/scratch/xxqian/OCD/STV_group',
     'work_dir': '/scratch/xxqian/work_flow',
     'log_file': 'seed_to_voxel_group_analysis.log',
     'sessions': ['ses-baseline', 'ses-followup'],
     'group_mask_file': '/scratch/xxqian/roi/tpl-MNI152NLin6Asym_res-02_desc-brain_mask.nii.gz',
     'num_permutations': 5000,
-    'use_tfce': True
+    'use_tfce': True,
 }
 
 # =============================================================================
@@ -102,6 +102,12 @@ def parse_arguments() -> argparse.Namespace:
         help='Path to clinical.csv file'
     )
     parser.add_argument(
+        '--input_dir', 
+        type=str, 
+        required=True,
+        help='Input directory containing FC map files from STV_1st.py'
+    )
+    parser.add_argument(
         '--output_dir', 
         type=str, 
         default=DEFAULT_CONFIG['output_dir'],
@@ -125,13 +131,14 @@ def parse_arguments() -> argparse.Namespace:
 # HELPER FUNCTIONS
 # =============================================================================
 
-def get_fc_path(subject: str, session: str, output_dir: str) -> str:
+
+def get_fc_path(subject: str, session: str, input_dir: str) -> str:
     """Get path to seed-to-voxel FC map file."""
     if not subject.startswith('sub-'):
         subject = f"sub-{subject}"
     
     return os.path.join(
-        output_dir, 
+        input_dir, 
         f"{subject}_{session}_task-rest_seed-PCC_fcmap_avg.nii.gz"
     )
 
@@ -218,6 +225,96 @@ def run_voxelwise_regression(
         logger.error("Failed to run voxel-wise regression for %s: %s", prefix, str(e))
         return False
 
+def run_voxelwise_regression_with_condition(
+    input_imgs: List[str], 
+    y_values: List[float], 
+    conditions: List[str],
+    subject_ids: List[str],
+    prefix: str,
+    work_dir: str,
+    output_dir: str,
+    group_mask_file: str,
+    logger: logging.Logger
+) -> bool:
+    """Run voxel-wise regression analysis using FSL Randomise with condition confounder."""
+    logger.info("Running voxel-wise regression with condition confounder for %s with %d subjects", prefix, len(input_imgs))
+    
+    try:
+        # Create design matrix with condition as confounder
+        # Format: [y_values, condition_dummies]
+        design_data = []
+        
+        # Get unique conditions (excluding 'unknown')
+        unique_conditions = [c for c in set(conditions) if c != 'unknown']
+        logger.info("Conditions in analysis: %s", unique_conditions)
+        
+        for i, (y_val, condition) in enumerate(zip(y_values, conditions)):
+            row = [y_val]  # Main effect
+            # Add condition dummy variables (reference is first condition)
+            for cond in unique_conditions[1:]:  # Skip first condition as reference
+                row.append(1 if condition == cond else 0)
+            design_data.append(row)
+        
+        design = np.array(design_data)
+        
+        # Save design matrix
+        mat_file = os.path.join(work_dir, f'{prefix}.mat')
+        with open(mat_file, 'w') as f:
+            f.write(f'/NumWaves {design.shape[1]}\n')
+            f.write(f'/NumPoints {len(y_values)}\n')
+            f.write('/Matrix\n')
+            for row in design:
+                f.write(' '.join(f'{val:0.4f}' for val in row) + '\n')
+        
+        # Create contrast file (test main effect only)
+        con_file = os.path.join(work_dir, f'{prefix}.con')
+        with open(con_file, 'w') as f:
+            f.write(f'/NumWaves {design.shape[1]}\n')
+            f.write('/NumContrasts 1\n')
+            f.write('/Matrix\n')
+            # Contrast: [1, 0, 0, ...] (test main effect, ignore condition effects)
+            contrast = [1] + [0] * (design.shape[1] - 1)
+            f.write(' '.join(str(val) for val in contrast) + '\n')
+        
+        logger.debug("Created design matrix: %s", mat_file)
+        logger.debug("Created contrast file: %s", con_file)
+        
+        # Merge input images
+        merged = os.path.join(output_dir, f'{prefix}_4d.nii.gz')
+        logger.info("Merging %d input images to %s", len(input_imgs), merged)
+        
+        imgs = [image.load_img(p) for p in input_imgs]
+        merged_img = image.concat_imgs(imgs)
+        merged_img.to_filename(merged)
+        logger.info("Successfully merged files to: %s", merged)
+        
+        # Apply group mask
+        masker = NiftiMasker(mask_img=group_mask_file, memory=work_dir)
+        masked = masker.fit_transform(image.load_img(merged))
+        masked_img = masker.inverse_transform(masked)
+        masked_path = os.path.join(output_dir, f'{prefix}_masked.nii.gz')
+        masked_img.to_filename(masked_path)
+        logger.info("Applied group mask and saved to: %s", masked_path)
+        
+        # Run FSL Randomise
+        logger.info("Running FSL Randomise with %d permutations", DEFAULT_CONFIG['num_permutations'])
+        rand = Randomise()
+        rand.inputs.in_file = masked_path
+        rand.inputs.mask = group_mask_file
+        rand.inputs.design_mat = mat_file
+        rand.inputs.tcon = con_file
+        rand.inputs.num_perm = DEFAULT_CONFIG['num_permutations']
+        rand.inputs.tfce = DEFAULT_CONFIG['use_tfce']
+        rand.inputs.base_name = os.path.join(output_dir, prefix)
+        
+        rand.run()
+        logger.info("FSL Randomise completed successfully for %s", prefix)
+        return True
+        
+    except Exception as e:
+        logger.error("Failed to run voxel-wise regression with condition confounder for %s: %s", prefix, str(e))
+        return False
+
 # =============================================================================
 # DATA LOADING AND VALIDATION
 # =============================================================================
@@ -227,7 +324,7 @@ def load_and_validate_metadata(
     clinical_csv: str, 
     logger: logging.Logger
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Load and validate metadata CSVs."""
+    """Load and validate metadata CSVs including condition information."""
     logger.info("Loading metadata from %s and %s", subjects_csv, clinical_csv)
     
     try:
@@ -247,27 +344,45 @@ def load_and_validate_metadata(
         logger.error("Failed to load clinical CSV: %s", e)
         raise ValueError(f"Failed to load clinical CSV: {e}")
 
+    # Load condition information from subjects_csv
+    try:
+        # The subjects_csv IS the shared_demographics.csv file, so condition info is already there
+        if 'condition' in df.columns:
+            # Fill missing conditions with 'unknown' for HC subjects, keep actual values for OCD subjects
+            df.loc[df['group'] == 'HC', 'condition'] = 'unknown'
+            df.loc[df['group'] == 'OCD', 'condition'] = df.loc[df['group'] == 'OCD', 'condition'].fillna('unknown')
+            
+            logger.info("Loaded condition information from subjects CSV")
+            logger.info("Condition distribution: %s", df['condition'].value_counts().to_dict())
+        else:
+            logger.warning("No 'condition' column found in subjects CSV. Adding default condition column.")
+            df['condition'] = 'unknown'
+            
+    except Exception as e:
+        logger.warning("Failed to load condition information: %s. Adding default condition column.", e)
+        df['condition'] = 'unknown'
+
     return df, df_clinical
 
 def validate_subjects(
-    fc_dir: str, 
+    input_dir: str, 
     metadata_df: pd.DataFrame, 
     logger: logging.Logger
 ) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
     """Validate subjects based on available seed-to-voxel FC files."""
-    logger.info("Validating subjects in FC directory %s", fc_dir)
+    logger.info("Validating subjects in input directory %s", input_dir)
     
-    if not os.path.exists(fc_dir):
-        logger.error("Input directory %s does not exist", fc_dir)
-        raise ValueError(f"Input directory {fc_dir} does not exist")
+    if not os.path.exists(input_dir):
+        logger.error("Input directory %s does not exist", input_dir)
+        raise ValueError(f"Input directory {input_dir} does not exist")
     
     # Find FC files
-    fc_files = glob.glob(os.path.join(fc_dir, '*fcmap_avg.nii.gz'))
+    fc_files = glob.glob(os.path.join(input_dir, '*fcmap_avg.nii.gz'))
     logger.info("Found %d FC files", len(fc_files))
     
     if not fc_files:
-        dir_contents = os.listdir(fc_dir)
-        logger.warning("No FC files found in %s. Directory contents: %s", fc_dir, dir_contents)
+        dir_contents = os.listdir(input_dir)
+        logger.warning("No FC files found in %s. Directory contents: %s", input_dir, dir_contents)
     
     # Parse subject and session information
     subject_sessions = {}
@@ -350,6 +465,7 @@ def validate_input_files(
 def perform_group_analysis(
     valid_group: List[str],
     metadata_df: pd.DataFrame,
+    input_dir: str,
     output_dir: str,
     work_dir: str,
     group_mask_file: str,
@@ -360,12 +476,12 @@ def perform_group_analysis(
     
     # Get HC and OCD paths
     hc_paths = [
-        get_fc_path(s, 'ses-baseline', output_dir) 
+        get_fc_path(s, 'ses-baseline', input_dir) 
         for s in metadata_df[metadata_df['group'] == 'HC']['subject_id']
         if s in valid_group
     ]
     ocd_paths = [
-        get_fc_path(s, 'ses-baseline', output_dir) 
+        get_fc_path(s, 'ses-baseline', input_dir) 
         for s in metadata_df[metadata_df['group'] == 'OCD']['subject_id']
         if s in valid_group
     ]
@@ -486,12 +602,13 @@ def perform_longitudinal_analysis(
     valid_longitudinal: List[str],
     metadata_df: pd.DataFrame,
     df_clinical: pd.DataFrame,
+    input_dir: str,
     output_dir: str,
     work_dir: str,
     group_mask_file: str,
     logger: logging.Logger
 ) -> None:
-    """Perform longitudinal analysis for OCD subjects."""
+    """Perform longitudinal analysis for OCD subjects with condition confounder."""
     logger.info("Performing longitudinal analysis")
     
     # Prepare OCD clinical data
@@ -506,16 +623,31 @@ def perform_longitudinal_analysis(
         logger.warning("No OCD subjects found for longitudinal analysis")
         return
     
+    # Get condition information for OCD subjects
+    ocd_conditions = []
+    for _, row in ocd_df.iterrows():
+        condition = metadata_df[metadata_df['subject_id'] == row['subject_id']]['condition'].iloc[0]
+        ocd_conditions.append(condition)
+    
+    logger.info("Condition distribution in longitudinal analysis: %s", 
+                {cond: ocd_conditions.count(cond) for cond in set(ocd_conditions)})
+    
     # 1. Baseline FC vs symptom change
     baseline_fc = [
-        get_fc_path(s, 'ses-baseline', output_dir) 
+        get_fc_path(s, 'ses-baseline', input_dir) 
         for s in ocd_df['subject_id']
     ]
+    baseline_valid = validate_input_files(baseline_fc, "baseline FC", logger)
     
-    if baseline_fc:
-        logger.info("Running baseline FC vs delta YBOCS regression")
-        success = run_voxelwise_regression(
-            baseline_fc, ocd_df['delta_ybocs'].tolist(), 
+    if baseline_valid:
+        # Get corresponding subjects and conditions
+        baseline_subjects = [ocd_df['subject_id'].iloc[i] for i, path in enumerate(baseline_fc) if path in baseline_valid]
+        baseline_conditions = [ocd_conditions[i] for i, path in enumerate(baseline_fc) if path in baseline_valid]
+        baseline_deltas = [ocd_df['delta_ybocs'].iloc[i] for i, path in enumerate(baseline_fc) if path in baseline_valid]
+        
+        logger.info("Running baseline FC vs delta YBOCS regression with condition confounder")
+        success = run_voxelwise_regression_with_condition(
+            baseline_valid, baseline_deltas, baseline_conditions, baseline_subjects,
             'baselineFC_vs_deltaYBOCS', work_dir, output_dir, group_mask_file, logger
         )
         
@@ -527,12 +659,14 @@ def perform_longitudinal_analysis(
     # 2. FC change vs symptom change
     logger.info("Analyzing FC change vs symptom change")
     change_maps = []
-    deltas = []
+    change_deltas = []
+    change_conditions = []
+    change_subjects = []
     
     for _, row in ocd_df.iterrows():
         try:
-            base_path = get_fc_path(row['subject_id'], 'ses-baseline', output_dir)
-            follow_path = get_fc_path(row['subject_id'], 'ses-followup', output_dir)
+            base_path = get_fc_path(row['subject_id'], 'ses-baseline', input_dir)
+            follow_path = get_fc_path(row['subject_id'], 'ses-followup', input_dir)
             
             if not (os.path.exists(base_path) and os.path.exists(follow_path)):
                 logger.warning(
@@ -550,7 +684,9 @@ def perform_longitudinal_analysis(
             out_path = os.path.join(work_dir, f"{row['subject_id']}_fc_change.nii.gz")
             diff.to_filename(out_path)
             change_maps.append(out_path)
-            deltas.append(row['delta_ybocs'])
+            change_deltas.append(row['delta_ybocs'])
+            change_conditions.append(metadata_df[metadata_df['subject_id'] == row['subject_id']]['condition'].iloc[0])
+            change_subjects.append(row['subject_id'])
             
             logger.debug("Created FC change map for subject %s: %s", row['subject_id'], out_path)
             
@@ -559,10 +695,10 @@ def perform_longitudinal_analysis(
             continue
     
     if change_maps:
-        logger.info("Running FC change vs delta YBOCS regression with %d subjects", len(change_maps))
-        success = run_voxelwise_regression(
-            change_maps, deltas, 'deltaFC_vs_deltaYBOCS', 
-            work_dir, output_dir, group_mask_file, logger
+        logger.info("Running FC change vs delta YBOCS regression with %d subjects and condition confounder", len(change_maps))
+        success = run_voxelwise_regression_with_condition(
+            change_maps, change_deltas, change_conditions, change_subjects,
+            'deltaFC_vs_deltaYBOCS', work_dir, output_dir, group_mask_file, logger
         )
         
         if success:
@@ -605,27 +741,28 @@ def main():
         logger.debug("Normalized subject IDs in metadata")
 
         # Validate subjects
-        valid_group, valid_longitudinal, _ = validate_subjects(args.output_dir, df, logger)
+        valid_group, valid_longitudinal, _ = validate_subjects(args.input_dir, df, logger)
         
         if not valid_group and not valid_longitudinal:
             logger.error("No valid subjects found for any analysis")
-            raise ValueError("No valid subjects found for any analysis. Check FC files in output directory.")
+            raise ValueError("No valid subjects found for any analysis. Check FC files in input directory.")
 
         # 1. Group difference at baseline
         if valid_group:
             perform_group_analysis(
-                valid_group, df, args.output_dir, args.work_dir, 
+                valid_group, df, args.input_dir, args.output_dir, args.work_dir, 
                 DEFAULT_CONFIG['group_mask_file'], logger
             )
 
         # 2. Longitudinal analyses
         if valid_longitudinal:
             perform_longitudinal_analysis(
-                valid_longitudinal, df, df_clinical, args.output_dir, 
+                valid_longitudinal, df, df_clinical, args.input_dir, args.output_dir, 
                 args.work_dir, DEFAULT_CONFIG['group_mask_file'], logger
             )
 
         logger.info("Main analysis completed successfully")
+        logger.info("Analyses completed: Group comparison, Longitudinal analysis")
     
     except Exception as e:
         logger.error("Main execution failed: %s", e)
