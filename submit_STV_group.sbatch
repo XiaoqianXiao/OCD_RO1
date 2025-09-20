@@ -133,7 +133,7 @@ validate_input_data() {
     
     # Check if input directory contains STV FC files
     local stv_files
-    stv_files=$(find "$INPUT_DIR" -name "*_pcc_seed_to_voxel_fc.nii.gz" 2>/dev/null | wc -l)
+    stv_files=$(find "$INPUT_DIR" -name "*PCC_fcmap_avg.nii.gz" 2>/dev/null | wc -l)
     
     if [ "$stv_files" -eq 0 ]; then
         log_warning "No Seed-to-Voxel FC files found in input directory: $INPUT_DIR"
@@ -164,8 +164,8 @@ setup_environment() {
     module load apptainer
     
     # Set environment variables for optimal performance
-    export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-    export MKL_NUM_THREADS=$SLURM_CPUS_PER_TASK
+    export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
+    export MKL_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
     export PYTHONUNBUFFERED=1
     
     # Set FSL environment variables
@@ -178,7 +178,7 @@ setup_environment() {
     log_info "  OMP_NUM_THREADS: $OMP_NUM_THREADS"
     log_info "  MKL_NUM_THREADS: $MKL_NUM_THREADS"
     log_info "  PYTHONUNBUFFERED: $PYTHONUNBUFFERED"
-    log_info "  FSLOUTPUTTYPE: $FSLOUTPUTTYPE"
+    log_info "  FSLOUTPUTTYPE: ${FSLOUTPUTTYPE:-not set}"
 }
 
 # =============================================================================
