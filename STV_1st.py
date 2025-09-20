@@ -347,8 +347,8 @@ def compute_seed_to_voxel_fc(
 def process_run(
     fmri_file: str,
     confounds_file: str,
-    seed_roi: image.Nifti1Image,
-    brain_mask: image.Nifti1Image,
+    seed_roi: Any,
+    brain_mask: Any,
     output_path: str,
     work_dir: str,
     logger: logging.Logger
