@@ -26,7 +26,7 @@ set -euo pipefail  # Exit on error, undefined vars, pipe failures
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-
+module load apptainer
 # Container and script paths
 CONTAINER="/scratch/xxqian/repo/image/OCD.sif"
 SCRIPT_PATH="/scratch/xxqian/repo/OCD_RO1/STV_group.py"
