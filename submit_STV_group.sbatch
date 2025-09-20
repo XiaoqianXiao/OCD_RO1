@@ -55,21 +55,6 @@ FSL_CONFIG=(
 # HELPER FUNCTIONS
 # =============================================================================
 
-log_info() {
-    log_message "INFO" "$@"
-}
-
-log_warning() {
-    log_message "WARNING" "$@"
-}
-
-log_error() {
-    log_message "ERROR" "$@"
-}
-
-log_success() {
-    log_message "SUCCESS" "$@"
-}
 
 check_dependencies() {
     log_info "Checking dependencies..."
