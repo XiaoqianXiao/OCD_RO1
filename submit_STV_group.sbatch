@@ -33,6 +33,7 @@ PROJECT_DIR="/project/6079231/dliang55/R01_AOCD"
 SCRATCH_DIR="/scratch/xxqian"
 OUTPUT_DIR="/scratch/xxqian/OCD/STV_group"
 WORK_DIR="/scratch/xxqian/OCD/work"
+ROI_DIR="/scratch/xxqian/roi"
 
 # Input data files
 SUBJECTS_CSV="${PROJECT_DIR}/metadata/shared_demographics.csv"
@@ -66,6 +67,7 @@ apptainer exec \
     --bind "${INPUT_DIR}:/input" \
     --bind "${OUTPUT_DIR}:/output" \
     --bind "${WORK_DIR}:/work" \
+    --bind "${ROI_DIR}:/roi" \
     --bind "${SUBJECTS_CSV}:/subjects.csv" \
     --bind "${CLINICAL_CSV}:/clinical.csv" \
     --bind "${SCRATCH_DIR}:/scratch" \
