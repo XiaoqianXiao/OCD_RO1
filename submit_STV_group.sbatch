@@ -161,7 +161,19 @@ setup_environment() {
     log_info "Setting up environment..."
     
     # Load required modules
+    log_info "Loading apptainer module..."
     module load apptainer
+    
+    # Verify apptainer is available
+    if command -v apptainer >/dev/null 2>&1; then
+        log_success "Apptainer command found: $(which apptainer)"
+    else
+        log_error "Apptainer command still not found after module load"
+        log_info "Available modules:"
+        module list 2>/dev/null || log_info "Cannot list modules"
+        log_info "PATH: $PATH"
+        exit 1
+    fi
     
     # Set environment variables for optimal performance
     export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
