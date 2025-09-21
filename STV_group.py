@@ -37,7 +37,7 @@ DEFAULT_CONFIG = {
     'log_file': 'seed_to_voxel_group_analysis.log',
     'sessions': ['ses-baseline', 'ses-followup'],
     'group_mask_file': '/roi/tpl-MNI152NLin6Asym_res-02_desc-brain_mask.nii.gz',
-    'num_permutations': 1000,
+    'num_permutations': 5000,
     'use_tfce': True,
 }
 
