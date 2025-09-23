@@ -1533,13 +1533,18 @@ def compute_correlation_chunked(time_series: np.ndarray, logger: logging.Logger)
             
             # Compute correlation for this chunk
             chunk_corr = np.corrcoef(chunk_i.T, chunk_j.T)
+
+            # Apply Fisher's z-transformation
+            chunk_corr = np.nan_to_num(chunk_corr, nan=0.0, posinf=1.0, neginf=-1.0)  # Clip to [-1, 1]
+            chunk_z = 0.5 * np.log((1 + chunk_corr) / (1 - chunk_corr))
+            chunk_z = np.nan_to_num(chunk_z, nan=0.0, posinf=0.0, neginf=0.0)
             
             # Handle the case where we're computing within the same chunk
             if i == j:
-                corr_matrix[i:end_i, i:end_i] = chunk_corr
+                corr_matrix[i:end_i, i:end_i] = chunk_z
             else:
-                corr_matrix[i:end_i, j:end_j] = chunk_corr
-                corr_matrix[j:end_j, i:end_i] = chunk_corr.T
+                corr_matrix[i:end_i, j:end_j] = chunk_z
+                corr_matrix[j:end_j, i:end_i] = chunk_z.T
             
             # Force garbage collection after each chunk
             import gc
@@ -1567,9 +1572,12 @@ def compute_connectivity_measures(
         
         # Use standard correlation computation
         corr_matrix = np.corrcoef(time_series.T)
-        
-        corr_matrix = np.nan_to_num(corr_matrix, nan=0.0)
-        
+
+        # Apply Fisher's z-transformation
+        corr_matrix = np.nan_to_num(corr_matrix, nan=0.0, posinf=1.0, neginf=-1.0)  # Clip to [-1, 1]
+        z_matrix = 0.5 * np.log((1 + corr_matrix) / (1 - corr_matrix))
+        z_matrix = np.nan_to_num(z_matrix, nan=0.0, posinf=0.0, neginf=0.0)  # Handle r = ±1 cases
+                
         logger.info(f"Correlation matrix shape: {corr_matrix.shape}, Memory usage: {corr_matrix.nbytes / 1024**2:.1f} MB")
         
         # Aggressive memory cleanup
@@ -1582,7 +1590,7 @@ def compute_connectivity_measures(
         
         # Save correlation matrix
         output_matrix = f"{output_prefix}_roiroi_matrix.npy"
-        np.save(output_matrix, corr_matrix)
+        np.save(output_matrix, z_matrix)
         logger.info(f"Saved correlation matrix: {output_matrix}")
         
         # Compute ROI-to-ROI FC
@@ -1599,7 +1607,7 @@ def compute_connectivity_measures(
                 'ROI2': roi_names[j],
                 'network1': net_i,
                 'network2': net_j,
-                'FC': corr_matrix[i, j]
+                'FC': z_matrix[i, j]
             })
         
         # Save ROI-to-ROI FC
@@ -1619,7 +1627,7 @@ def compute_connectivity_measures(
             
             for net_j in unique_networks:
                 corrs = [
-                    corr_matrix[i, j] for j in range(len(roi_names))
+                    z_matrix[i, j] for j in range(len(roi_names))
                     if network_labels.get(j + 1, 'Unknown') == net_j and i != j
                 ]
                 
@@ -1661,7 +1669,7 @@ def compute_connectivity_measures(
                 if net_j == 'Unknown':
                     continue
                 
-                corr = corr_matrix[i, j]
+                corr = z_matrix[i, j]
                 if net_i == net_j:
                     within_corrs.append(corr)
                 else:
@@ -1686,7 +1694,7 @@ def compute_connectivity_measures(
         # Within-network connectivity
         for net in unique_networks:
             within_corrs = [
-                corr_matrix[i, j] for i in range(len(roi_names)) for j in range(len(roi_names))
+                z_matrix[i, j] for i in range(len(roi_names)) for j in range(len(roi_names))
                 if i != j and network_labels.get(i + 1, 'Unknown') == net
                 and network_labels.get(j + 1, 'Unknown') == net
             ]
@@ -1703,7 +1711,7 @@ def compute_connectivity_measures(
         for i, net1 in enumerate(unique_networks):
             for net2 in unique_networks[i+1:]:  # Avoid duplicates and self-connections
                 between_corrs = [
-                    corr_matrix[i, j] for i in range(len(roi_names)) for j in range(len(roi_names))
+                    z_matrix[i, j] for i in range(len(roi_names)) for j in range(len(roi_names))
                     if i != j and network_labels.get(i + 1, 'Unknown') == net1
                     and network_labels.get(j + 1, 'Unknown') == net2
                 ]

@@ -1,0 +1,106 @@
+# Cursor Rules for OCD Project
+# This file configures Cursor IDE behavior for the OCD neuroimaging analysis project
+
+## Project Overview
+This is a neuroimaging analysis project for OCD (Obsessive-Compulsive Disorder) research using functional connectivity analysis with various brain atlases.
+
+## Key Files and Their Purposes
+- `NW_1st.py`: First-level analysis script for individual subject FC computation
+- `NW_roi_roi.py`: ROI-to-ROI group analysis script
+- `NW_network_network.py`: Network-level analysis script
+- `NW_roi_network.py`: ROI-to-Network analysis script
+- `submit_*.sh`: SLURM job submission scripts for supercomputer execution
+- `results_visualization_*.ipynb`: Jupyter notebooks for results visualization
+
+## Atlas Support
+The project supports multiple brain atlases:
+- Power 2011 (default)
+- Schaefer 2018 (100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 ROIs)
+- Harvard-Oxford (cortical and subcortical)
+- YEO 2011 (7 and 17 networks)
+- AAL, Talairach, and custom atlases
+
+## Code Style and Conventions
+- Use descriptive variable names (e.g., `baseline_fc_data`, `feature_info`)
+- Include comprehensive docstrings for functions
+- Use type hints where appropriate
+- Follow pandas/numpy conventions for data manipulation
+- Use logging for debugging and progress tracking
+
+## Common Patterns
+- FC data files follow pattern: `*_task-rest_{atlas_name}_roiroi_fc_avg.csv`
+- Group analysis separates HC (Healthy Controls) vs OCD patients
+- Longitudinal analysis compares baseline vs followup sessions
+- Condition-based analysis compares treatment vs waitlist groups
+
+## Debugging Tips
+- Use `--verbose` flag for detailed logging
+- Check file naming conventions match between NW_1st.py output and group analysis input
+- Verify atlas names are consistent across scripts
+- Use `--auto-detect-atlas` when unsure of atlas naming
+
+## Memory Management
+- The scripts handle large FC matrices (up to 1000x1000 for Schaefer 1000)
+- Batch processing is used to prevent memory overflow
+- Garbage collection is called after large operations
+
+## AI Assistant Expertise
+The AI assistant should work as an expert in neural imaging data analysis with FSL and Nipype, providing:
+- Deep understanding of fMRI preprocessing and analysis pipelines
+- Expertise in FSL tools (FEAT, FILM, BET, FLIRT, etc.)
+- Proficiency in Nipype workflow construction and optimization
+- Knowledge of GLM modeling, contrast generation, and statistical analysis
+- Understanding of neuroimaging data formats (BIDS, NIfTI, etc.)
+- Experience with first-level and group-level analysis workflows
+
+## Error Handling
+- Byte string issues in feature names are automatically handled
+- Special characters in ROI names are sanitized for regression formulas
+- Missing data is handled gracefully with appropriate warnings
+- Container environment issues (Nilearn data directory) are auto-fixed
+
+## Testing
+- Use small test datasets for development
+- Test with different atlas configurations
+- Verify output file formats match expected column names
+- Check that all required dependencies are available
+
+## Performance Considerations
+- FC computation is memory-intensive
+- Use appropriate SLURM resources for supercomputer jobs
+- Consider parallel processing for large datasets
+- Monitor memory usage during development
+
+## File Organization
+- Keep analysis scripts in root directory
+- Store results in `results/` subdirectory
+- Use descriptive names for output files
+- Maintain consistent naming conventions across scripts
+
+## Dependencies
+- Python 3.7+
+- pandas, numpy, scipy
+- statsmodels
+- nilearn
+- matplotlib, seaborn (for visualization)
+- scikit-learn (for some analyses)
+
+## Common Issues and Solutions
+1. **Byte string errors**: Fixed with automatic string conversion
+2. **Atlas naming mismatches**: Use `--auto-detect-atlas` or check file patterns
+3. **Memory issues**: Use batch processing and garbage collection
+4. **Missing dependencies**: Check container environment and package versions
+5. **File format issues**: Verify CSV column names match expected format
+
+## Development Workflow
+1. Test changes locally with small datasets
+2. Verify script syntax and imports
+3. Check output file formats
+4. Test on supercomputer with full dataset
+5. Update documentation as needed
+
+## Notes
+- This project uses BIDS (Brain Imaging Data Structure) conventions
+- Subject IDs follow pattern: `sub-XXX` where XXX is the subject number
+- Session IDs: `ses-baseline`, `ses-followup`
+- Task: `task-rest` (resting-state fMRI)
